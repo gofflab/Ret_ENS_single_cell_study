@@ -1,0 +1,508 @@
+---
+title: "HSCR QC and Filtering"
+author: "Liz Vincent"
+date: "September 27, 2017"
+output: pdf_document
+---
+```{r include=FALSE}
+knitr::opts_chunk$set(message=FALSE,warning=FALSE,error=FALSE,fig.align="center")
+#source('init.R')
+library(ggplot2)
+library(ggbiplot)
+library(monocle)
+```
+
+# Import Data
+### Data from Cuffnorm run on all 768 cells
+```{r Import_Data, results='hide'}
+# Gene FPKMs
+fpkms<-read.delim("genes.fpkm_table",row.names=1,stringsAsFactors = F)
+colnames(fpkms)<-unlist(strsplit(as.character(colnames(fpkms)),"_0$")) # Remove "_0" after cell ids
+
+# Isoform FPKMs
+isoform_fpkms<-read.delim("isoforms.fpkm_table",row.names=1,stringsAsFactors = F)
+colnames(isoform_fpkms)<-unlist(strsplit(as.character(colnames(isoform_fpkms)),"_0$")) # Remove "_0" after cell ids
+
+# Sample Annotation
+sample_ann<-read.delim("samples.table",stringsAsFactors = F)
+sample_ann<-sample_ann[,c(-2,-5)] # Remove file path and external scale (external scale = 1 for all cells)
+names(sample_ann)<-c("cell_id",names(sample_ann)[2:3]) # Rename sample_id column as cell_id
+sample_ann$cell_id<-unlist(strsplit(as.character(sample_ann$cell_id),"_0$")) # Remove "_0" after cell ids
+
+master_cell_sheet<-read.delim("sample_info.txt",stringsAsFactors=F,row.names=1)
+sample_info<-merge(sample_ann,master_cell_sheet,by="cell_id")
+rownames(sample_info)<-sample_info[,1] # Set row names to cell_ids
+sample_info<-sample_info[,-1]
+
+# Gene Annotation
+gene_ann<-read.delim("genes.attr_table",row.names=1,stringsAsFactors = F)
+
+fd<-new("AnnotatedDataFrame",data=gene_ann)
+pd<-new("AnnotatedDataFrame",data=sample_info)
+
+# Create cell data set object
+dat.relative <- newCellDataSet(cellData=as.matrix(fpkms),
+                      phenoData=pd,
+                      featureData=fd)
+```
+
+# Remove Outliers
+### Iteratively run PCA and manually remove outliers
+```{r PCA_filtering}
+# PCA on FPKM values
+dat.relative.pca<-prcomp(t(exprs(dat.relative)),scale=F,center=F)
+```
+
+```{r figures, echo = F}
+ggbiplot(dat.relative.pca,var.axes=F,groups=(dat.relative.pca$x[,1] < -2e+06)) + 
+  theme(aspect.ratio = 1, legend.position="none") + 
+  scale_color_manual(values=c("black", "red")) +
+  ggtitle("PC1 vs. PC2") 
+```
+
+Remove PC 1 and 2 outliers and rerun PCA
+```{r remove_outliers}
+remove<-names(which(dat.relative.pca$x[,1] < -2e+06))
+dat.relative.filtered<-dat.relative[,!(row.names(pData(dat.relative)) %in% remove)]
+
+dat.relative.filtered.pca<-prcomp(t(exprs(dat.relative.filtered)),scale=F,center=F)
+```
+
+Repeat iteratively until there are no obvious outliers
+```{r echo = F, fig.width=7.5, fig.height = 10}
+p1<-ggbiplot(dat.relative.filtered.pca,var.axes=F,groups=(dat.relative.filtered.pca$x[,1] < -1e+06)) + 
+  theme(aspect.ratio = 1, legend.position="none") +  
+  scale_color_manual(values=c("black", "red")) +
+  ggtitle("1. PC1 vs. PC2") 
+
+remove<-c(remove,names(which(dat.relative.filtered.pca$x[,1] < -1e+06)))
+dat.relative.filtered<-dat.relative[,!(row.names(pData(dat.relative)) %in% remove)]
+
+dat.relative.filtered.pca<-prcomp(t(exprs(dat.relative.filtered)),scale=F,center=F)
+
+p2<-ggbiplot(dat.relative.filtered.pca,var.axes=F, groups=(dat.relative.filtered.pca$x[,1] < -1e+06 | dat.relative.filtered.pca$x[,2] < -3e+05)) + 
+  theme(aspect.ratio = 1, legend.position="none") + 
+  scale_color_manual(values=c("black", "red")) +
+  ggtitle("2. PC1 vs. PC2")
+
+remove<-c(remove,names(which(dat.relative.filtered.pca$x[,1] < -1e+06 | dat.relative.filtered.pca$x[,2] < -3e+05)))
+dat.relative.filtered<-dat.relative[,!(row.names(pData(dat.relative)) %in% remove)]
+
+dat.relative.filtered.pca<-prcomp(t(exprs(dat.relative.filtered)),scale=F,center=F)
+
+p3<-ggbiplot(dat.relative.filtered.pca,var.axes=F, groups=(dat.relative.filtered.pca$x[,2] < -2e+05)) + 
+  theme(aspect.ratio = 1, legend.position="none") + 
+  scale_color_manual(values=c("black", "red")) +
+  ggtitle("3. PC1 vs. PC2")
+
+remove<-c(remove,names(which(dat.relative.filtered.pca$x[,2] < -2e+05)))
+dat.relative.filtered<-dat.relative[,!(row.names(pData(dat.relative)) %in% remove)]
+
+dat.relative.filtered.pca<-prcomp(t(exprs(dat.relative.filtered)),scale=F,center=F)
+
+p4<-ggbiplot(dat.relative.filtered.pca,var.axes=F,groups=(dat.relative.filtered.pca$x[,2] > 1e+05)) + 
+  theme(aspect.ratio = 1,legend.position="none") + 
+  scale_color_manual(values=c("black", "red")) +
+  ggtitle("4. PC1 vs. PC2")
+
+remove<-c(remove,names(which(dat.relative.filtered.pca$x[,2] > 1e+05)))
+dat.relative.filtered<-dat.relative[,!(row.names(pData(dat.relative)) %in% remove)]
+
+dat.relative.filtered.pca<-prcomp(t(exprs(dat.relative.filtered)),scale=F,center=F)
+
+p5<-ggbiplot(dat.relative.filtered.pca,var.axes=F,groups=(dat.relative.filtered.pca$x[,2] > 1.5e+05)) + 
+  theme(aspect.ratio = 1, legend.position="none") + 
+  scale_color_manual(values=c("black", "red")) +
+  ggtitle("5. PC1 vs. PC2")
+
+remove<-c(remove,names(which(dat.relative.filtered.pca$x[,2] > 1.5e+05)))
+dat.relative.filtered<-dat.relative[,!(row.names(pData(dat.relative)) %in% remove)]
+
+dat.relative.filtered.pca<-prcomp(t(exprs(dat.relative.filtered)),scale=F,center=F)
+
+p6<-ggbiplot(dat.relative.filtered.pca,var.axes=F) + 
+  theme(aspect.ratio = 1,legend.position="none") +
+  ggtitle("6. PC1 vs. PC2") 
+
+grid.arrange(p1,p2,p3,p4,p5,p6,ncol=2)
+```
+
+# Rerun Cuffnorm on remaining 743 cells and import data
+```{r Post_rerunning_Cuffnorm}
+# Gene FPKMs
+fpkms<-read.delim("outliers_removed_genes.fpkm_table",row.names=1,stringsAsFactors = F)
+colnames(fpkms)<-unlist(strsplit(as.character(colnames(fpkms)),"_0$"))
+
+# Isoform FPKMs
+isoform_fpkms<-read.delim("outliers_removed_isoforms.fpkm_table",row.names=1,stringsAsFactors = F)
+colnames(isoform_fpkms)<-unlist(strsplit(as.character(colnames(isoform_fpkms)),"_0$"))
+
+# Sample Annotation
+sample_ann<-read.delim("outliers_removed_samples.table",row.names=1,stringsAsFactors = F)
+rownames(sample_ann)<-unlist(strsplit(as.character(rownames(sample_ann)),"_0$"))
+sample_info<-merge(sample_ann,master_cell_sheet,by='row.names')
+rownames(sample_info)<-sample_info[,1]
+sample_info<-sample_info[,-1]
+
+# Gene Annotation
+gene_ann<-read.delim("outliers_removed_genes.attr_table",row.names=1,stringsAsFactors = F)
+
+fd<-new("AnnotatedDataFrame",data=gene_ann)
+pd<-new("AnnotatedDataFrame",data=sample_info)
+
+# Create cell data set object
+dat.relative.743 <- newCellDataSet(cellData=as.matrix(fpkms),
+                      phenoData=pd,
+                      featureData=fd)
+```
+
+### Run PCA on second round of cuffnorm data
+```{r}
+dat.relative.pca<-prcomp(t(exprs(dat.relative.743)),scale=F,center=F)
+```
+
+```{r echo = F}
+ggbiplot(dat.relative.pca,var.axes=F) + 
+  theme(aspect.ratio = 1) +
+  ggtitle("PC1 vs. PC2")
+```
+
+### Remove cells expressing very few genes
+Remove cells with fewer detected genes than the negative control wells.
+```{r}
+dat.relative.743<-detectGenes(dat.relative.743,min_expr=0.000001) 
+# Detect any non-zero genes
+
+remove<-rownames(pData(dat.relative.743)[pData(dat.relative.743)$num_genes_expressed < 700,])
+dat.relative.filtered<-dat.relative.743[,!(row.names(pData(dat.relative.743)) %in% remove)]
+```
+
+```{r echo = F, fig.height=4, fig.width=7.5}
+p1<-ggplot(pData(dat.relative.743))+
+  geom_histogram(aes(x=num_genes_expressed, fill=type),binwidth=80) + 
+  ggtitle("Genes Expressed per Cell - All Cells") +
+  scale_fill_brewer(palette="Set1") +
+  ylab("Cells") +
+  xlab("Genes Expressed") + 
+  geom_vline(xintercept=700, lty="dashed") +
+  theme(legend.position = "left",aspect.ratio=1,plot.title = element_text(size=10), axis.title = element_text(size=8), legend.title = element_text(size=9), legend.text=element_text(size=8))
+
+p2<-ggplot(pData(dat.relative.filtered))+
+  geom_histogram(aes(x=num_genes_expressed, fill=type),binwidth=80) + 
+  ggtitle("Genes Expressed per Cell - After Removal") +
+  scale_fill_manual(values = "#377eb8") +
+  ylab("Cells") +
+  xlab("Genes Expressed") +
+  theme(aspect.ratio=1, legend.position="none",plot.title = element_text(size=10), axis.title = element_text(size=8), legend.title = element_text(size=9), legend.text=element_text(size=8))
+
+grid.draw(cbind(ggplotGrob(p1), ggplotGrob(p2), size="last"))
+```
+
+### Convert FPKM to CPC
+```{r run_relative2abs}
+isoform_t_estimate<-estimate_t(isoform_fpkms)
+
+fpkm_matrix_adj<-relative2abs(dat.relative.filtered,cores=detectCores()-1,t_estimate = isoform_t_estimate)
+
+# Create new cell data set with CPC values
+dat.filtered <- newCellDataSet(as.matrix(fpkm_matrix_adj),
+                      phenoData = pd[rownames(pd) %in% colnames(fpkm_matrix_adj)],
+                      featureData=fd,
+                      expressionFamily=negbinomial.size(),
+                      lowerDetectionLimit=1)
+```
+
+### Add and format metadata
+```{r}
+pData(dat.filtered)$Total_mRNAs <- colSums(round(exprs(dat.filtered)))
+pData(dat.filtered)$mean_expr<-esApply(dat.filtered,2,function(x){mean(x)})
+pData(dat.filtered)$sd_expr<-esApply(dat.filtered,2,function(x){sd(x)})
+pData(dat.filtered)$genotype<-factor(pData(dat.filtered)$genotype)
+pData(dat.filtered)$sex<-factor(pData(dat.filtered)$sex)
+pData(dat.filtered)$batch<-factor(pData(dat.filtered)$batch)
+pData(dat.filtered)$source_plate<-factor(pData(dat.filtered)$source_plate)
+pData(dat.filtered)$split_plate<-factor(pData(dat.filtered)$split_plate)
+pData(dat.filtered)$RT_date<-factor(pData(dat.filtered)$RT_date)
+
+dat.filtered<-detectGenes(dat.filtered,min_expr=0.1)
+dat.filtered@dim_reduce_type<-"DDRTree"
+dat.filtered@auxOrderingData<-new.env()
+
+fData(dat.filtered)$gene_id<-rownames(fData(dat.filtered))
+fData(dat.filtered)$mean_expr<-esApply(dat.filtered,1,function(x){mean(x)})
+fData(dat.filtered)$sd_expr<-esApply(dat.filtered,1,function(x){sd(x)})
+fData(dat.filtered)$bcv<-(fData(dat.filtered)$sd_expr/fData(dat.filtered)$mean_expr)**2
+fData(dat.filtered)$percent_detection<-
+  (fData(dat.filtered)$num_cells_expressed/dim(dat.filtered)[2])*100
+```
+
+# PCA on Cleaned Data
+```{r}
+dat.filtered.pca<-prcomp(t(exprs(dat.filtered)),scale=F,center=F)
+```
+
+```{r echo = F,fig.height=6.5,fig.width=7.5}
+p1<-ggbiplot(dat.filtered.pca,var.axes=F,groups=pData(dat.filtered)$num_genes_expressed,alpha=0) + 
+  theme(aspect.ratio = 1,plot.title = element_text(size=12), axis.title = element_text(size=8), legend.title = element_text(size=8), legend.text=element_text(size=7)) + 
+  ggtitle("PC1 vs. PC2") + 
+  scale_color_continuous(name="Number\nof Genes\nExpressed") +  
+  geom_point(aes(color=pData(dat.filtered)$num_genes_expressed), size = 0.6)
+
+p2<-ggbiplot(dat.filtered.pca,var.axes=F,groups=pData(dat.filtered)$batch,alpha=0) + 
+  theme(aspect.ratio = 1,plot.title = element_text(size=12), axis.title = element_text(size=8), legend.title = element_text(size=8), legend.text=element_text(size=7)) + 
+  ggtitle("PC1 vs. PC2") + 
+  scale_color_brewer("Batch",palette="Set1") +  
+  geom_point(aes(color=pData(dat.filtered)$batch), size = 0.6)
+
+p3<-ggbiplot(dat.filtered.pca,var.axes=F,groups=pData(dat.filtered)$sex,alpha=0) + 
+  theme(aspect.ratio = 1,plot.title = element_text(size=12), axis.title = element_text(size=8), legend.title = element_text(size=8), legend.text=element_text(size=7)) + 
+  ggtitle("PC1 vs. PC2") + 
+  scale_color_brewer("Sex",palette="Set1") +  
+  geom_point(aes(color=pData(dat.filtered)$sex), size = 0.6)
+
+p4<-ggbiplot(dat.filtered.pca,var.axes=F,groups=pData(dat.filtered)$Total_mRNAs,alpha=0) + 
+  theme(aspect.ratio = 1,plot.title = element_text(size=12), axis.title = element_text(size=8), legend.title = element_text(size=8), legend.text=element_text(size=7)) + 
+  ggtitle("PC1 vs. PC2") + 
+  scale_color_continuous(name="Total\nmRNAs") +  
+  geom_point(aes(color=pData(dat.filtered)$Total_mRNAs), size = 0.6)
+
+grid.draw(rbind(cbind(ggplotGrob(p1), ggplotGrob(p2), size="last"),cbind(ggplotGrob(p3), ggplotGrob(p4), size="last"),size="last"))
+```
+
+# Determine Expressed Genes
+A gene is considered expressed if it is detected at a minimum value of 10^-6 FPKM in at least 20 cells (approx. 10% of cells in one condition), with a mean expression level of 0.01 CPC.
+```{r Determine_expressed_genes }
+expressed_genes<-rownames(fData(dat.filtered)[fData(dat.filtered)$num_cells_expressed >= 20 & fData(dat.filtered)$mean_expr > 0.01,])
+#12,470 genes
+```
+
+```{r echo = F,fig.height=5,fig.width=7.5}
+p1<-ggplot(fData(dat.filtered))+
+  geom_histogram(aes(x=num_cells_expressed),binwidth=10) +
+  labs(x="# of Cells",y="# of Genes",title="Cells Expressing a Gene") +
+  geom_vline(xintercept=20,lty="dashed") +
+  theme(plot.title = element_text(size=10), axis.title = element_text(size=10))
+
+p2<-ggplot(fData(dat.filtered[expressed_genes,]))+
+  geom_histogram(aes(x=num_cells_expressed),binwidth=10) +
+  labs(x="# of Cells",y="# of Genes",title="Cells Expressing a Gene -\nExpressed Genes Only") +
+  theme(plot.title = element_text(size=10), axis.title = element_text(size=10))
+
+grid.draw(cbind(ggplotGrob(p1), ggplotGrob(p2), size="last"))
+```
+
+# Plots of Cleaned Cell Data Set
+```{r cleaned_figures, echo = F, fig.height=5,fig.width=5}
+melted_relative<-melt(log10(exprs(dat.relative)+1))
+
+removedCells<-row.names(pData(dat.relative))[!(row.names(pData(dat.relative)) %in% row.names(pData(dat.filtered)))]
+controls<-sample(row.names(pData(dat.filtered)),length(removedCells))
+
+ggplot(melted_relative, aes(x=value, col=ifelse(Var2 %in% removedCells, "Removed\nCells", "Control\nCells"))) + 
+  geom_density() +
+  xlim(0.00001,7) +
+  labs(x="Gene Expression Value (CPC)",y="Density",title="Gene Expression Distributions Averaged") +
+  theme(legend.title=element_blank(), plot.title = element_text(size=12), axis.title = element_text(size=10), legend.text=element_text(size=8)) +
+  scale_color_brewer(palette="Set1")
+
+ggplot(pData(dat.filtered),aes(x=genotype))+geom_bar(aes(fill=batch)) + 
+  facet_wrap(~sex) + 
+  scale_fill_brewer("Batch",palette="Set1") +
+  geom_text(stat="count", aes(label = ..count..),vjust=-0.5) +
+  labs(x="Genotype and Sex",y="# Cells",title="Cells Remaining")  +
+  theme(plot.title = element_text(size=12), axis.title = element_text(size=10), legend.text=element_text(size=8))
+```
+
+# PCA on Cleaned Data, All Expressed Genes
+```{r pca}
+expressed_genes.pca<-
+  prcomp(t(log10(exprs(dat.filtered[expressed_genes,])+1)),scale=T,center=T)
+```
+
+```{r pca_plots,echo=F,fig.width=12, fig.height=10}
+percentVar <- expressed_genes.pca$sdev^2 / sum(expressed_genes.pca$sdev^2)
+cumVar <- cumsum((expressed_genes.pca$sdev)^2) / sum((expressed_genes.pca$sdev)^2)
+
+p1<-ggbiplot(expressed_genes.pca,var.axes=F,groups=pData(dat.filtered)$batch,ellipse=T) + 
+  scale_color_brewer(palette="Set1") + 
+  ggtitle("batch") + 
+  theme(aspect.ratio=1)
+p2<-ggbiplot(expressed_genes.pca,var.axes=F,groups=pData(dat.filtered)$genotype,ellipse=T) + 
+  scale_color_brewer(palette="Set1") + 
+  ggtitle("genotype") + 
+  theme(aspect.ratio=1)
+p3<-ggbiplot(expressed_genes.pca,var.axes=F,groups=pData(dat.filtered)$sex,ellipse=T) + 
+  scale_color_brewer(palette="Set1") + 
+  ggtitle("sex") + 
+  theme(aspect.ratio=1)
+p4<-ggbiplot(expressed_genes.pca,var.axes=F,groups=pData(dat.filtered)$source_plate,ellipse=T) + 
+  scale_color_brewer(palette="Set1") + 
+  ggtitle("Source plate") + 
+  theme(aspect.ratio=1)
+p5<-ggbiplot(expressed_genes.pca,var.axes=F,groups=pData(dat.filtered)$sort_date,ellipse=T) + 
+  scale_color_brewer(palette="Set1") + 
+  ggtitle("Sort date") + 
+  theme(aspect.ratio=1)
+p6<-ggbiplot(expressed_genes.pca,var.axes=F,groups=pData(dat.filtered)$num_genes_expressed,ellipse=F) + 
+  ggtitle("Number of genes detected") + 
+  theme(aspect.ratio=1)
+
+grid.arrange(p1,p2,p3,p4,p5,p6,ncol=2)
+```
+
+```{r,echo=F}
+invisible(
+  plot(cumVar*100,main="Cumulative Variance Explained - All Expressed Genes",xlab="PCA Index",ylab="Cumulative % Variance",xaxt="n",yaxt="n",xlim=c(0,30)) + 
+  axis(1, at = seq(0,30,by=5),las=2) + 
+  axis(2, at = seq(0,100,by=10),las=2)
+)
+```
+
+## Estimate Dispersions to Variance Stabilize and Run PCA
+```{r batch_correction}
+dat.filtered<-estimateSizeFactors(dat.filtered)
+dat.filtered<-estimateDispersions(dat.filtered,cores=detectCores()-1)
+
+variance_stabilized.pca<-prcomp(t(vstExprs(dat.filtered[expressed_genes,])),scale=F,center=F)
+```
+
+```{r pca_datcorrected_plots,echo=F,fig.width=12, fig.height=10}
+percentVar <- round(variance_stabilized.pca$sdev)^2 / sum((variance_stabilized.pca$sdev)^2)
+cumVar <- cumsum((variance_stabilized.pca$sdev)^2) / sum((variance_stabilized.pca$sdev)^2)
+
+p1<-ggbiplot(variance_stabilized.pca,var.axes=F,groups=pData(dat.filtered[expressed_genes,])$batch,ellipse=T) + 
+  scale_color_brewer(palette="Set1") + 
+  ggtitle("Batch") + 
+  theme(aspect.ratio=1)
+p2<-ggbiplot(variance_stabilized.pca,var.axes=F,groups=pData(dat.filtered[expressed_genes,])$genotype,ellipse=T) + 
+  scale_color_brewer(palette="Set1") +
+  ggtitle("Genotype") + 
+  theme(aspect.ratio=1)
+p3<-ggbiplot(variance_stabilized.pca,var.axes=F,groups=pData(dat.filtered[expressed_genes,])$sex,ellipse=T) + 
+  scale_color_brewer(palette="Set1") + 
+  ggtitle("Sex") + 
+  theme(aspect.ratio=1)
+p4<-ggbiplot(variance_stabilized.pca,var.axes=F,groups=pData(dat.filtered[expressed_genes,])$source_plate,ellipse=T) + 
+  scale_color_brewer(palette="Set1") +
+  ggtitle("Source Plate") + 
+  theme(aspect.ratio=1)
+p5<-ggbiplot(variance_stabilized.pca,var.axes=F,groups=pData(dat.filtered[expressed_genes,])$sort_date,ellipse=T) + 
+  scale_color_brewer(palette="Set1") + 
+  ggtitle("Sort Date") + 
+  theme(aspect.ratio=1)
+p6<-ggbiplot(variance_stabilized.pca,var.axes=F,groups=pData(dat.filtered[expressed_genes,])$num_genes_expressed,ellipse=F) + 
+  ggtitle("Number of Genes Detected") + 
+  theme(aspect.ratio=1)
+
+grid.arrange(p1,p2,p3,p4,p5,p6,ncol=2)
+```
+
+```{r,echo=F}
+invisible(
+  plot(cumVar*100,main="Cumulative Variance Explained - Variance Stabilized",xlab="PCA Index",ylab="Cumulative % Variance",xaxt="n",xlim=c(0,30)) + 
+    axis (1, at = seq(0,30,by=5),las=2) +
+    axis(2, at = c(93:100))
+)
+```
+
+## Determine Overdispersed Genes and Run PCA on Overdispersed Genes
+Subset the uncorrected Cell Data Set by batch to determine overdispersed genes within each batch and take the insection of genes overdispersed in both batches.
+```{r subset_by_batch,include=F}
+dat.batch1<-dat.filtered[,pData(dat.filtered)$batch == 1]
+dat.batch1<-estimateSizeFactors(dat.batch1)
+dat.batch1<-estimateDispersions(dat.batch1,cores=detectCores()-1)
+
+dat.batch2<-dat.filtered[,pData(dat.filtered)$batch == 2]
+dat.batch2<-estimateSizeFactors(dat.batch2)
+dat.batch2<-estimateDispersions(dat.batch2,cores=detectCores()-1)
+```
+
+```{r overdispersion}
+#calculate dispersions
+disp_table<-dispersionTable(dat.filtered)
+disp_table$gene_id<-as.character(disp_table$gene_id)
+
+disp_table.batch1 <- dispersionTable(dat.batch1)
+disp_table.batch1$gene_id<-as.character(disp_table.batch1$gene_id)
+disp_table.batch2 <- dispersionTable(dat.batch2)
+disp_table.batch2$gene_id<-as.character(disp_table.batch2$gene_id)
+
+#save overdispersed genes from each batch
+unsup_clustering_genes.batch1 <- disp_table.batch1[disp_table.batch1$dispersion_empirical >= 2.7*(disp_table.batch1$dispersion_fit),'gene_id']
+unsup_clustering_genes.batch2 <- disp_table.batch2[disp_table.batch2$dispersion_empirical >= 2.7*(disp_table.batch2$dispersion_fit),'gene_id']
+
+#limit to genes overdispersed in both batches and in the expressed gene set calculated earlier
+unsup_clustering_genes_intersect<-intersect(unsup_clustering_genes.batch1, unsup_clustering_genes.batch2)
+unsup_clustering_expressed_genes<-intersect(unsup_clustering_genes_intersect, expressed_genes)
+
+dat.batch1 <- setOrderingFilter(dat.batch1, unsup_clustering_genes.batch1)
+p.batch1<-plot_ordering_genes(dat.batch1) + ggtitle("Batch 1 Overdispersed Genes")
+dat.batch2 <- setOrderingFilter(dat.batch2, unsup_clustering_genes.batch2)
+p.batch2<-plot_ordering_genes(dat.batch2) + ggtitle("Batch 2 Overdispersed Genes")
+dat.filtered <- setOrderingFilter(dat.filtered, unsup_clustering_genes_intersect)
+p.intersect<-plot_ordering_genes(dat.filtered) + ggtitle("Genes Overdispersed in Both Batches")
+dat.filtered <- setOrderingFilter(dat.filtered, unsup_clustering_expressed_genes)
+p.expressed<-plot_ordering_genes(dat.filtered) + ggtitle("Genes Overdispersed in Both Batches\nExpressed Genes")
+```
+
+```{r echo=F}
+grid.arrange(p.batch1,p.batch2,p.intersect,p.expressed,ncol=2) 
+```
+
+```{r pca_overdispersion}
+dat.filtered.pca<-
+  prcomp(t(vstExprs(dat.filtered)[unsup_clustering_expressed_genes,]),
+         scale=F,
+         center=F)
+```
+
+```{r pca_overdisperdsion_plots,echo=F,fig.width=12, fig.height=10}
+percentVar <- (dat.filtered.pca$sdev)^2 / sum((dat.filtered.pca$sdev)^2)
+cumVar <- cumsum((dat.filtered.pca$sdev)^2) / sum((dat.filtered.pca$sdev)^2)
+
+p1<-ggbiplot(dat.filtered.pca,var.axes=F,groups=pData(dat.filtered)$batch,ellipse=T) + 
+  scale_color_brewer(palette="Set1") + 
+  ggtitle("Batch") + 
+  theme(aspect.ratio=1)
+p2<-ggbiplot(dat.filtered.pca,var.axes=F,groups=pData(dat.filtered)$genotype,ellipse=T) + 
+  scale_color_brewer(palette="Set1") + 
+  ggtitle("Genotype") + 
+  theme(aspect.ratio=1)
+p3<-ggbiplot(dat.filtered.pca,var.axes=F,groups=pData(dat.filtered)$sex,ellipse=T) + 
+  scale_color_brewer(palette="Set1") + 
+  ggtitle("Sex") + 
+  theme(aspect.ratio=1)
+p4<-ggbiplot(dat.filtered.pca,var.axes=F,groups=pData(dat.filtered)$source_plate,ellipse=T) + 
+  scale_color_brewer(palette="Set1") + 
+  ggtitle("Source Plate") + 
+  theme(aspect.ratio=1)
+p5<-ggbiplot(dat.filtered.pca,var.axes=F,groups=pData(dat.filtered)$sort_date,ellipse=T) + 
+  scale_color_brewer(palette="Set1") + 
+  ggtitle("Sort Date") + 
+  theme(aspect.ratio=1)
+p6<-ggbiplot(dat.filtered.pca,var.axes=F,groups=pData(dat.filtered)$num_genes_expressed,ellipse=F) + 
+  ggtitle("Number of Genes Detected") + 
+  theme(aspect.ratio=1)
+
+grid.arrange(p1,p2,p3,p4,p5,p6,ncol=2)
+```
+
+```{r,echo=F}
+invisible(
+  plot(cumVar*100,main="Cumulative Variance Explained - Overdispersed Genes",xlab="PCA Index",ylab="Cumulative % Variance",xaxt="n",yaxt="n",xlim=c(0,50)) + 
+    axis(1, at = seq(0,50,by=5)) +
+    axis(2, at = c(84:100))
+)
+```
+
+```{r saveCDS, echo=F}
+saveRDS(dat.filtered,file="datfiltered_postQC.rds")
+saveRDS(expressed_genes,file="expressed_genes.rds")
+saveRDS(unsup_clustering_expressed_genes,file="unsup_clustering_expressed_genes.rds")
+```
+
+# Session Info
+
+```{r echo=FALSE}
+sessionInfo()
+```
