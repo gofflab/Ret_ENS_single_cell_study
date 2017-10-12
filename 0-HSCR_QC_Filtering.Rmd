@@ -10,6 +10,12 @@ knitr::opts_chunk$set(message=FALSE,warning=FALSE,error=FALSE,fig.align="center"
 library(ggplot2)
 library(ggbiplot)
 library(monocle)
+library(gridExtra)
+library(reshape2)
+library(dplyr)
+library(tidyverse)
+library(devtools)
+library(tidyr)
 ```
 
 # Import Data
@@ -31,8 +37,10 @@ sample_ann$cell_id<-unlist(strsplit(as.character(sample_ann$cell_id),"_0$")) # R
 
 master_cell_sheet<-read.delim("sample_info.txt",stringsAsFactors=F,row.names=1)
 sample_info<-merge(sample_ann,master_cell_sheet,by="cell_id")
+alignment_rates<-read.delim("reads.txt",stringsAsFactors = F)
+alignment_rates$unmapped_reads<-alignment_rates$unmapped_mates/2
+sample_info<-merge(sample_info,alignment_rates,by="cell_id")
 rownames(sample_info)<-sample_info[,1] # Set row names to cell_ids
-sample_info<-sample_info[,-1]
 
 # Gene Annotation
 gene_ann<-read.delim("genes.attr_table",row.names=1,stringsAsFactors = F)
@@ -47,22 +55,159 @@ dat.relative <- newCellDataSet(cellData=as.matrix(fpkms),
 ```
 
 # Remove Outliers
+
+### Remove cells with low alignment rates
+```{r}
+n<-floor(nrow(pData(dat.relative)) * 0.05)  # 5% of 1369 cells = 68.45 cells, round down to 68
+read_min<-(pData(dat.relative)[order(pData(dat.relative)$total_reads),"total_reads"])[n]  # 5% of cells have < 21810 total reads
+
+pData(dat.relative) %>%
+  mutate(group=paste(age, sex, genotype)) %>%
+  ggplot(.) + 
+  geom_point(aes(x=total_reads,y=alignment_percentage,col=group)) +
+  stat_ellipse(aes(x=total_reads, y=alignment_percentage,col=group),type = "norm") +
+  geom_vline(xintercept = read_min, lty="dashed") +
+  geom_hline(yintercept = 50, lty="dashed") +
+  labs(x = "Total Number of Reads",y="% Reads Aligned",color="Group")
+
+p1<-pData(dat.relative) %>%
+  mutate(group=paste(age, sex, genotype)) %>%
+  ggplot(.) + 
+  geom_point(aes(x=total_reads,y=alignment_percentage,col=group)) +
+  stat_ellipse(aes(x=total_reads, y=alignment_percentage,col=group),type = "norm") +
+  labs(x = "Total Number of Reads",y="% Reads Aligned",color="Group")
+
+p2<-ggplot(pData(dat.relative)) + 
+  geom_point(aes(x=total_reads,y=alignment_percentage,col=genotype)) +
+  stat_ellipse(aes(x=total_reads, y=alignment_percentage,col=genotype),type = "norm") +
+  labs(x = "Total Number of Reads",y="% Reads Aligned",color="Genotype") +
+  scale_color_brewer(palette = "Set1")
+
+p3<-ggplot(pData(dat.relative)) + 
+  geom_point(aes(x=total_reads,y=alignment_percentage,col=sex)) +
+  stat_ellipse(aes(x=total_reads, y=alignment_percentage,col=sex),type = "norm") +
+  labs(x = "Total Number of Reads",y="% Reads Aligned",color="Sex") +
+  scale_color_brewer(palette = "Set1")
+
+p4<-ggplot(pData(dat.relative)) + 
+  geom_point(aes(x=total_reads,y=alignment_percentage,col=age)) +
+  stat_ellipse(aes(x=total_reads, y=alignment_percentage,col=age),type = "norm") +
+  labs(x = "Total Number of Reads",y="% Reads Aligned",color="Age") +
+  scale_color_brewer(palette = "Set1")
+
+p5<-ggplot(pData(dat.relative)) + 
+  geom_point(aes(x=total_reads,y=alignment_percentage,col=batch)) +
+  stat_ellipse(aes(x=total_reads, y=alignment_percentage,col=batch),type = "norm") +
+  labs(x = "Total Number of Reads",y="% Reads Aligned",color="Batch") +
+  scale_color_brewer(palette = "Set1")
+
+p6<-ggplot(pData(dat.relative)) + 
+  geom_point(aes(x=total_reads,y=alignment_percentage,col=split_plate)) +
+  stat_ellipse(aes(x=total_reads, y=alignment_percentage,col=split_plate),type = "norm") +
+  labs(x = "Total Number of Reads",y="% Reads Aligned",color="Rearrayed Plate")
+
+legend<-unique(pData(dat.relative)[,c("source_plate","age","sex","genotype")] %>%
+       mutate(group=paste(source_plate,age,sex,genotype)))
+
+p7<-ggplot(pData(dat.relative)) + 
+  geom_point(aes(x=total_reads,y=alignment_percentage,col=source_plate)) +
+  stat_ellipse(aes(x=total_reads, y=alignment_percentage,col=source_plate),type = "norm") +
+  labs(x = "Total Number of Reads",y="% Reads Aligned",color="Embryo") +
+  scale_color_discrete(breaks=legend$source_plate,
+                       labels=legend$group)
+
+p8<-ggplot(pData(dat.relative)) + 
+  geom_point(aes(x=total_reads,y=alignment_percentage,col=index_set)) +
+  stat_ellipse(aes(x=total_reads, y=alignment_percentage,col=index_set),type = "norm") +
+  labs(x = "Total Number of Reads",y="% Reads Aligned",color="Index Set")
+ 
+p9<-ggplot(pData(dat.relative)) + 
+  geom_point(aes(x=total_reads,y=alignment_percentage,col=index_1)) +
+  stat_ellipse(aes(x=total_reads, y=alignment_percentage,col=index_1),type = "norm") +
+  labs(x = "Total Number of Reads",y="% Reads Aligned",color="Column Index")
+  
+p10<-ggplot(pData(dat.relative)) + 
+  geom_point(aes(x=total_reads,y=alignment_percentage,col=index_2)) +
+  stat_ellipse(aes(x=total_reads, y=alignment_percentage,col=index_2),type = "norm") +
+  labs(x = "Total Number of Reads",y="% Reads Aligned",color="Row Index")
+
+p11<-ggplot(pData(dat.relative)) + 
+  geom_point(aes(x=total_reads,y=alignment_percentage,col=factor(num_cells))) +
+  stat_ellipse(aes(x=total_reads, y=alignment_percentage,col=factor(num_cells)),type = "norm") +
+  labs(x = "Total Number of Reads",y="% Reads Aligned",color="Number of Cells per Well")
+
+p12<-ggplot(pData(dat.relative)) + 
+  geom_point(aes(x=total_reads,y=alignment_percentage,col=factor(sort_date))) +
+  stat_ellipse(aes(x=total_reads, y=alignment_percentage,col=factor(sort_date)),type = "norm") +
+  labs(x = "Total Number of Reads",y="% Reads Aligned",color="Sort Date")
+
+
+grid.draw(
+  rbind(
+    cbind(ggplotGrob(p1),
+          ggplotGrob(p2),
+          ggplotGrob(p3),
+          ggplotGrob(p4),
+          size="last"),
+    cbind(ggplotGrob(p5),
+          ggplotGrob(p6),
+          ggplotGrob(p7),
+          ggplotGrob(p8),
+          size="last"),
+    cbind(ggplotGrob(p9),
+          ggplotGrob(p10),
+          ggplotGrob(p11),
+          ggplotGrob(p12),
+          size="last"),
+    size="last")
+)
+
+pData(dat.relative) %>%
+  mutate(group=paste(age, sex, genotype)) %>%
+  ggplot(.) + 
+  stat_density(aes(x=alignment_percentage), fill="gray70", color="gray60", alpha=0.3) +
+  facet_wrap(~group) +
+  scale_fill_brewer(palette = "Set1") +
+  scale_color_brewer(palette = "Set1") +
+  theme_bw()
+
+pData(dat.relative) %>%
+  mutate(group=paste(age, sex, genotype)) %>%
+  ggplot(.) + 
+  stat_density(aes(x=total_reads), fill="gray70", color="gray60", alpha=0.3) +
+  facet_wrap(~group) +
+  scale_fill_brewer(palette = "Set1") +
+  scale_color_brewer(palette = "Set1") +
+  theme_bw()
+
+remove<-pData(dat.relative)[pData(dat.relative)$total_reads < read_min & pData(dat.relative)$alignment_percentage < 50,"cell_id"]
+
+table(pData(dat.relative[,remove])$age, pData(dat.relative[,remove])$sex,pData(dat.relative[,remove])$genotype)
+
+dat.relative.filtered<-dat.relative[,!(row.names(pData(dat.relative)) %in% remove)]
+```
+
+
 ### Iteratively run PCA and manually remove outliers
 ```{r PCA_filtering}
 # PCA on FPKM values
-dat.relative.pca<-prcomp(t(exprs(dat.relative)),scale=F,center=F)
+
+dat.relative.pca<-prcomp(t(exprs(dat.relative.filtered)),scale=F,center=F)
+# If scale=T:
+# Error in prcomp.default(t(exprs(dat.relative)), scale = T, center = T) : 
+#  cannot rescale a constant/zero column to unit variance
 ```
 
 ```{r figures, echo = F}
-ggbiplot(dat.relative.pca,var.axes=F,groups=(dat.relative.pca$x[,1] < -2e+06)) + 
+p1<-ggbiplot(dat.relative.pca,var.axes=F,groups=(dat.relative.pca$x[,1] < -5e+6)) + 
   theme(aspect.ratio = 1, legend.position="none") + 
   scale_color_manual(values=c("black", "red")) +
-  ggtitle("PC1 vs. PC2") 
+  ggtitle("1. PC1 vs. PC2") 
 ```
 
 Remove PC 1 and 2 outliers and rerun PCA
 ```{r remove_outliers}
-remove<-names(which(dat.relative.pca$x[,1] < -2e+06))
+remove<-c(remove,names(which(dat.relative.pca$x[,1] < -5e+06)))
 dat.relative.filtered<-dat.relative[,!(row.names(pData(dat.relative)) %in% remove)]
 
 dat.relative.filtered.pca<-prcomp(t(exprs(dat.relative.filtered)),scale=F,center=F)
@@ -70,62 +215,126 @@ dat.relative.filtered.pca<-prcomp(t(exprs(dat.relative.filtered)),scale=F,center
 
 Repeat iteratively until there are no obvious outliers
 ```{r echo = F, fig.width=7.5, fig.height = 10}
-p1<-ggbiplot(dat.relative.filtered.pca,var.axes=F,groups=(dat.relative.filtered.pca$x[,1] < -1e+06)) + 
+p2<-ggbiplot(dat.relative.filtered.pca,var.axes=F,groups=(dat.relative.filtered.pca$x[,1] < -5e+06 | dat.relative.filtered.pca$x[,2] < -3e+06)) + 
   theme(aspect.ratio = 1, legend.position="none") +  
   scale_color_manual(values=c("black", "red")) +
-  ggtitle("1. PC1 vs. PC2") 
+  ggtitle("2. PC1 vs. PC2") 
 
-remove<-c(remove,names(which(dat.relative.filtered.pca$x[,1] < -1e+06)))
+remove<-c(remove,names(which(dat.relative.filtered.pca$x[,1] < -5e+06 | dat.relative.filtered.pca$x[,2] < -3e+06)))
 dat.relative.filtered<-dat.relative[,!(row.names(pData(dat.relative)) %in% remove)]
 
 dat.relative.filtered.pca<-prcomp(t(exprs(dat.relative.filtered)),scale=F,center=F)
 
-p2<-ggbiplot(dat.relative.filtered.pca,var.axes=F, groups=(dat.relative.filtered.pca$x[,1] < -1e+06 | dat.relative.filtered.pca$x[,2] < -3e+05)) + 
-  theme(aspect.ratio = 1, legend.position="none") + 
-  scale_color_manual(values=c("black", "red")) +
-  ggtitle("2. PC1 vs. PC2")
-
-remove<-c(remove,names(which(dat.relative.filtered.pca$x[,1] < -1e+06 | dat.relative.filtered.pca$x[,2] < -3e+05)))
-dat.relative.filtered<-dat.relative[,!(row.names(pData(dat.relative)) %in% remove)]
-
-dat.relative.filtered.pca<-prcomp(t(exprs(dat.relative.filtered)),scale=F,center=F)
-
-p3<-ggbiplot(dat.relative.filtered.pca,var.axes=F, groups=(dat.relative.filtered.pca$x[,2] < -2e+05)) + 
+p3<-ggbiplot(dat.relative.filtered.pca,var.axes=F, groups=(dat.relative.filtered.pca$x[,1] < -3e+06 | dat.relative.filtered.pca$x[,2] < -2e+06)) + 
   theme(aspect.ratio = 1, legend.position="none") + 
   scale_color_manual(values=c("black", "red")) +
   ggtitle("3. PC1 vs. PC2")
 
-remove<-c(remove,names(which(dat.relative.filtered.pca$x[,2] < -2e+05)))
+remove<-c(remove,names(which(dat.relative.filtered.pca$x[,1] < -3e+06 | dat.relative.filtered.pca$x[,2] < -2e+06)))
 dat.relative.filtered<-dat.relative[,!(row.names(pData(dat.relative)) %in% remove)]
 
 dat.relative.filtered.pca<-prcomp(t(exprs(dat.relative.filtered)),scale=F,center=F)
 
-p4<-ggbiplot(dat.relative.filtered.pca,var.axes=F,groups=(dat.relative.filtered.pca$x[,2] > 1e+05)) + 
-  theme(aspect.ratio = 1,legend.position="none") + 
+p4<-ggbiplot(dat.relative.filtered.pca,var.axes=F, groups=(dat.relative.filtered.pca$x[,1] > 2e+06 | dat.relative.filtered.pca$x[,2] < -2e+06)) + 
+  theme(aspect.ratio = 1, legend.position="none") + 
   scale_color_manual(values=c("black", "red")) +
   ggtitle("4. PC1 vs. PC2")
 
-remove<-c(remove,names(which(dat.relative.filtered.pca$x[,2] > 1e+05)))
+remove<-c(remove,names(which(dat.relative.filtered.pca$x[,1] > 2e+06 | dat.relative.filtered.pca$x[,2] < -2e+06)))
 dat.relative.filtered<-dat.relative[,!(row.names(pData(dat.relative)) %in% remove)]
 
 dat.relative.filtered.pca<-prcomp(t(exprs(dat.relative.filtered)),scale=F,center=F)
 
-p5<-ggbiplot(dat.relative.filtered.pca,var.axes=F,groups=(dat.relative.filtered.pca$x[,2] > 1.5e+05)) + 
-  theme(aspect.ratio = 1, legend.position="none") + 
+p5<-ggbiplot(dat.relative.filtered.pca,var.axes=F,groups=(dat.relative.filtered.pca$x[,1] > 1e+06 | dat.relative.filtered.pca$x[,2] > 1e+06)) + 
+  theme(aspect.ratio = 1,legend.position="none") + 
   scale_color_manual(values=c("black", "red")) +
   ggtitle("5. PC1 vs. PC2")
 
-remove<-c(remove,names(which(dat.relative.filtered.pca$x[,2] > 1.5e+05)))
+remove<-c(remove,names(which(dat.relative.filtered.pca$x[,1] > 1e+06 | dat.relative.filtered.pca$x[,2] > 1e+06)))
 dat.relative.filtered<-dat.relative[,!(row.names(pData(dat.relative)) %in% remove)]
 
 dat.relative.filtered.pca<-prcomp(t(exprs(dat.relative.filtered)),scale=F,center=F)
 
-p6<-ggbiplot(dat.relative.filtered.pca,var.axes=F) + 
-  theme(aspect.ratio = 1,legend.position="none") +
-  ggtitle("6. PC1 vs. PC2") 
+p6<-ggbiplot(dat.relative.filtered.pca,var.axes=F,groups=(dat.relative.filtered.pca$x[,1] > 1e+06 | dat.relative.filtered.pca$x[,2] < -1e+06)) + 
+  theme(aspect.ratio = 1, legend.position="none") + 
+  scale_color_manual(values=c("black", "red")) +
+  ggtitle("6. PC1 vs. PC2")
 
-grid.arrange(p1,p2,p3,p4,p5,p6,ncol=2)
+remove<-c(remove,names(which(dat.relative.filtered.pca$x[,1] > 1e+06 | dat.relative.filtered.pca$x[,2] < -1e+06)))
+dat.relative.filtered<-dat.relative[,!(row.names(pData(dat.relative)) %in% remove)]
+
+dat.relative.filtered.pca<-prcomp(t(exprs(dat.relative.filtered)),scale=F,center=F)
+
+p7<-ggbiplot(dat.relative.filtered.pca,var.axes=F,groups=(dat.relative.filtered.pca$x[,1] > 1e+06)) +
+  theme(aspect.ratio = 1, legend.position="none") + 
+  scale_color_manual(values=c("black", "red")) +
+  ggtitle("7. PC1 vs. PC2")
+
+remove<-c(remove,names(which(dat.relative.filtered.pca$x[,1] > 1e+06)))
+dat.relative.filtered<-dat.relative[,!(row.names(pData(dat.relative)) %in% remove)]
+
+dat.relative.filtered.pca<-prcomp(t(exprs(dat.relative.filtered)),scale=F,center=F)
+
+p8<-ggbiplot(dat.relative.filtered.pca,var.axes=F) +
+  theme(aspect.ratio = 1) + 
+  ggtitle("8. PC1 vs. PC2")
+
+write.table(x = remove,"outliers.txt",quote=F,sep="\n",row.names=F,col.names=F)
+
+grid.arrange(p1,p2,p3,p4,p5,p6,p7,p8,ncol=4)
+
+pg1<-ggplot(pData(dat.relative)) +
+  geom_point(aes(x=total_reads,y=alignment_percentage,col=ifelse(pData(dat.relative)$cell_id %in% remove,"Removed","Kept"))) +
+  labs(x = "Total Number of Reads",y="% Reads Aligned",color="Status") + 
+  scale_color_manual(values=c("black","red")) +
+  theme(legend.position = c(0.9,0.94))
+     
+
+pg2<-pData(dat.relative) %>%
+  mutate(group=ifelse(pData(dat.relative)$cell_id %in% remove,"Removed","Kept")) %>%
+  ggplot(.) + 
+  stat_density(aes(x=total_reads), fill="gray70", color="gray60", alpha=0.3) +
+  facet_wrap(~group) +
+  scale_fill_brewer(palette = "Set1") +
+  scale_color_brewer(palette = "Set1") +
+  theme_bw() +
+  xlab("Total Reads")
+
+pg3<-pData(dat.relative) %>%
+  mutate(group=ifelse(pData(dat.relative)$cell_id %in% remove,"Removed","Kept")) %>%
+  ggplot(.) + 
+  stat_density(aes(x=alignment_percentage), fill="gray70", color="gray60", alpha=0.3) +
+  facet_wrap(~group) +
+  scale_fill_brewer(palette = "Set1") +
+  scale_color_brewer(palette = "Set1") +
+  theme_bw() +
+  xlab("% Aligned Reads")
+
+pg4<-pData(dat.relative) %>%
+  filter(cell_id %in% remove) %>%
+  mutate(group=paste(age, sex, genotype)) %>%
+  ggplot(.,aes(x=group,fill=sex,alpha=as.numeric(factor(genotype)))) +
+    geom_bar() +
+    scale_alpha("Genotype",range=c(0.4,1),breaks=c(2,1),labels=c("hom","het")) +
+    scale_fill_brewer("Sex",palette="Set1") +
+    scale_y_continuous(limits = c(NA,27),expand = c(0,0)) +
+    theme(axis.ticks.x = element_blank(),axis.title.x=element_blank(), legend.position = c(0.9,0.9)) +
+    geom_text(stat="count", aes(label = ..count..),vjust=-0.5,alpha = 1)
+#  labs(x="Genotype and Sex",y="# Cells",title="Cells Remaining")
+
+
+library(cowplot)
+
+grid1<-plot_grid(pg2,pg3,ncol=2)
+grid2<-plot_grid(pg1,pg4,ncol=2)
+pg<-plot_grid(grid2,grid1,nrow=2, rel_heights = c(2,1))
+save_plot("removed_cells.pdf", pg, base_height=16, base_width = 22)
 ```
+
+#######################################
+# Stopped here
+#######################################
+
 
 # Rerun Cuffnorm on remaining 743 cells and import data
 ```{r Post_rerunning_Cuffnorm}

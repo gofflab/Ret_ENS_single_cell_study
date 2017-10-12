@@ -5,8 +5,7 @@ library(lubridate)
 
 HD02_sample_info<-read.delim("HD02_sample_info.txt",stringsAsFactors = F)
 HD03_sample_info<-read.delim("HD03_sample_info.txt",stringsAsFactors = F)
-HD02_sample_info<-HD02_sample_info[,-2]
-HD02_sample_info<-HD02_sample_info[,-24]
+HD02_sample_info<-HD02_sample_info[,c(-2,-23)]
 HD03_sample_info<-HD03_sample_info[!(HD03_sample_info$pool == "No"),]
 names(HD02_sample_info)
 names(HD03_sample_info)
