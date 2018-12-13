@@ -502,9 +502,7 @@ pheatmap(mat = heatmap_data,
 ```
 
 ```{r}
-tmp <- dat.filtered[,pData(dat.filtered)$cluster %in% c(4, 9)]
-
-neuron_bifuracation_difftest <- differentialGeneTest(tmp[expressed_genes,], fullModelFormulaStr = "~batch + cluster", reducedModelFormulaStr = "~batch", cores = detectCores() - 1)
+neuron_bifuracation_difftest <- differentialGeneTest(dat.filtered[expressed_genes,pData(dat.filtered)$cluster %in% c(4, 9)], fullModelFormulaStr = "~batch + sex + genotype + CellType + cluster", reducedModelFormulaStr = "~batch + sex + genotype + CellType", cores = detectCores()-1)
 
 neuron_bifuracation_difftest_sorted <- neuron_bifuracation_difftest[order(neuron_bifuracation_difftest$qval),]
 
@@ -512,10 +510,10 @@ neuron_bifuracation_difftest_sorted_sig_genes <- rownames(neuron_bifuracation_di
 
 bifurcation_gene_names <- lookupGeneName(dat.filtered, neuron_bifuracation_difftest_sorted_sig_genes)
 
-# het-only = 10, mixed pop = 9
+# het-only = 9, mixed pop = 4
 
-pop4_means <- apply(exprs(tmp)[neuron_bifuracation_difftest_sorted_sig_genes,pData(tmp)$cluster == 4], 1,mean)
-pop9_means <- apply(exprs(tmp)[neuron_bifuracation_difftest_sorted_sig_genes,pData(tmp)$cluster == 9], 1,mean)
+pop4_means <- apply(exprs(dat.filtered)[neuron_bifuracation_difftest_sorted_sig_genes, pData(dat.filtered)$cluster == 4], 1,mean)
+pop9_means <- apply(exprs(dat.filtered)[neuron_bifuracation_difftest_sorted_sig_genes, pData(dat.filtered)$cluster == 9], 1,mean)
 
 relative_exprs <- pop9_means/pop4_means
 # 9 = het 

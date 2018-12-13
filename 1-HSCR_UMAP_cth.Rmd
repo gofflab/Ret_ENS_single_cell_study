@@ -283,6 +283,11 @@ cth<-newCellTypeHierarchy()
 
 cth<-addCellType(cth,"Neuron",classify_func=function(x){ x[lookupGeneId(dat.filtered.expressed.normalized,"Snap25"),] > 50 | x[lookupGeneId(dat.filtered.expressed.normalized,"Nefl"),] > 90 | x[lookupGeneId(dat.filtered.expressed.normalized,"Rtn1"),] > 50 | x[lookupGeneId(dat.filtered.expressed.normalized,"Vip"),] > 60 | x[lookupGeneId(dat.filtered.expressed.normalized,"Tubb3"),] > 160 | x[lookupGeneId(dat.filtered.expressed.normalized,"Nefh"),] > 1 | x[lookupGeneId(dat.filtered.expressed.normalized,"Elavl3"),] > 6 | x[lookupGeneId(dat.filtered.expressed.normalized,"Elavl4"),] > 200 })
 
+#Nos1, Cartpt, Gal, Ass1 = NITRERGIC neurons!
+#Also Moxd1, Tmem255b, Cox8b, Anxa11
+#Gpx3 expressed highly in tip of cluster 9
+#Pattern 10 is proliferating glia
+
 cth<-addCellType(cth,"Noradrenergic Neuron",parent_cell_type_name = "Neuron",classify_func=function(x){ x[lookupGeneId(dat.filtered.expressed.normalized,"Isl1"),] > 10 & x[lookupGeneId(dat.filtered.expressed.normalized,"Dbh"),] > 40})
 
 cth<-addCellType(cth,"Acetylcholinergic Neuron",parent_cell_type_name = "Neuron",classify_func=function(x){ (x[lookupGeneId(dat.filtered.expressed.normalized,"Ache"),] > 1 & x[lookupGeneId(dat.filtered.expressed.normalized,"Slc18a3"),] > 0)})

@@ -625,3 +625,30 @@ pheatmap(mat = heatmap_data,
          treeheight_row = 0
          )
 ```
+
+
+```{r pattern_exploration}
+plotUMAP(dat.filtered, color_by = np20.gapsResult@sampleFactors[,3]) + 
+      ggtitle("Pattern 3")
+
+pattern_3_weights <- as.data.frame(np20.gapsResult@featureLoadings[, 3, drop = F])
+pattern_3_weights$gene_short_name <- lookupGeneName(dat.filtered, rownames(pattern_3_weights), unique = F)
+pattern_3_weights <- pattern_3_weights[order(pattern_3_weights$Pattern_3, decreasing = T),]
+
+plotUMAP(dat.filtered, markers = pattern_3_weights$gene_short_name[1:4])
+
+genes <- fData(dat.filtered)[gsub("\\..*","", rownames(fData(dat.filtered))) %in% np20patternMarkers$Pattern_3[33:48], "gene_short_name"]
+
+plotUMAP(dat.filtered, markers = genes, scale = T)
+
+# C2cd4b, Ebf4, Fgf10, Gabre, Gm10475, 6530402F18Rik, Ampd3, Baiap3, Gm13999, Nptx1, A430105J06Rik, Astn2, AV356131, Brdt, 
+
+#Leng9, Shroom1
+
+# Pattern 10 = proliferating/cycling glia
+pattern_10_weights <- np20.gapsResult@sampleFactors[order(np20.gapsResult@sampleFactors[,10], decreasing = T), 10, drop =F]
+
+pattern_10_cells <- pData(dat.filtered)[names(pattern_10_weights[pattern_10_weights > 0.5,]),]
+
+table(pattern_10_cells$genotype)
+```
