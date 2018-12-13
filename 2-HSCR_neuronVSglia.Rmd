@@ -1,0 +1,1555 @@
+---
+title: "HSCR Neuron vs. Glia"
+author: "Liz Vincent"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: pdf_document
+---
+```{r init,include=F}
+knitr::opts_chunk$set(message=FALSE,warning=FALSE,error=FALSE,dev='pdf',fig.width=9, fig.height=6.5)
+
+source('init.R')
+
+#load dat.filtered and expressed_genes
+
+#dat.filtered <- readRDS("datfiltered_postCTH.rds")
+#expressed_genes <- readRDS("expressed_genes")
+```
+
+## Subset by cell type
+
+### Neurons
+```{r neuron_gene_selection}
+dat.neurons <- vagal_dat.filtered[,pData(vagal_dat.filtered)$CellType %in% c("Neuron","Noradrenergic Neuron","Acetylcholinergic Neuron","Transition Cell")]
+# 396 cells
+
+dat.neurons@dim_reduce_type <- "DDRTree"
+dat.neurons@auxOrderingData <- new.env()
+dat.neurons <- estimateSizeFactors(dat.neurons)
+dat.neurons <- estimateDispersions(dat.neurons)
+
+fData(dat.neurons)$num_cells_expressed <- rowSums(exprs(dat.neurons) > 0)
+fData(dat.neurons)$mean_expr <- esApply(dat.neurons,1,function(x){mean(x)})
+fData(dat.neurons)$sd_expr <- esApply(dat.neurons,1,function(x){sd(x)})
+fData(dat.neurons)$bcv <-
+  (fData(dat.neurons)$sd_expr/fData(dat.neurons)$mean_expr)**2
+fData(dat.neurons)$percent_detection <-
+  (fData(dat.neurons)$num_cells_expressed/dim(dat.neurons)[2])*100
+
+neuron_expressed_genes <- rownames(fData(dat.neurons)[fData(dat.neurons)$num_cells_expressed > 20 &fData(dat.neurons)$sd_expr > .Machine$double.eps,])
+#Expressed in at least 20 cells (5%) at > 0 CPC with SD > 0
+#11,955 genes
+```
+
+# Normalization by sequencing depth
+```{r normalize_by_read_depth}
+# sum across expressed genes for each cell and divide all gene values by sum to normalize by read depth
+dat.neurons.expressed <- dat.neurons[neuron_expressed_genes,]
+dat.neurons.expressed.normalized <- dat.neurons.expressed
+exprs(dat.neurons.expressed.normalized) <- apply(exprs(dat.neurons.expressed), 2, function(x){x/sum(x)})*1e+5
+
+fData(dat.neurons.expressed.normalized)$sd_expr <- esApply(dat.neurons.expressed.normalized, 1, function(x){sd(x)})
+```
+
+```{r}
+dat.neurons.batch1 <- dat.neurons.expressed.normalized[,pData(dat.neurons.expressed.normalized)$batch == "HD01"]
+dat.neurons.batch1 <- estimateSizeFactors(dat.neurons.batch1)
+dat.neurons.batch1 <- estimateDispersions(dat.neurons.batch1,cores=detectCores()-1)
+disp_table.neurons.batch1 <- dispersionTable(dat.neurons.batch1)
+disp_table.neurons.batch1$gene_id <- as.character(disp_table.neurons.batch1$gene_id)
+
+dat.neurons.batch2 <- dat.neurons[,pData(dat.neurons.expressed.normalized)$batch == "HD02"]
+dat.neurons.batch2 <- estimateSizeFactors(dat.neurons.batch2)
+dat.neurons.batch2 <- estimateDispersions(dat.neurons.batch2,cores=detectCores()-1)
+disp_table.neurons.batch2 <- dispersionTable(dat.neurons.batch2)
+disp_table.neurons.batch2$gene_id <- as.character(disp_table.neurons.batch2$gene_id)
+
+dat.neurons.batch3 <- dat.neurons[,pData(dat.neurons.expressed.normalized)$batch == "HD03_pool_1"]
+dat.neurons.batch3 <- estimateSizeFactors(dat.neurons.batch3)
+dat.neurons.batch3 <- estimateDispersions(dat.neurons.batch3,cores=detectCores()-1)
+disp_table.neurons.batch3 <- dispersionTable(dat.neurons.batch3)
+disp_table.neurons.batch3$gene_id <- as.character(disp_table.neurons.batch3$gene_id)
+
+dat.neurons.batch4 <- dat.neurons[,pData(dat.neurons.expressed.normalized)$batch == "HD03_pool_2"]
+dat.neurons.batch4 <- estimateSizeFactors(dat.neurons.batch4)
+dat.neurons.batch4 <- estimateDispersions(dat.neurons.batch4,cores=detectCores()-1)
+disp_table.neurons.batch4 <- dispersionTable(dat.neurons.batch4)
+disp_table.neurons.batch4$gene_id <- as.character(disp_table.neurons.batch4$gene_id)
+
+dat.neurons.batch5 <- dat.neurons[,pData(dat.neurons.expressed.normalized)$batch == "HD03_pool_3"]
+dat.neurons.batch5 <- estimateSizeFactors(dat.neurons.batch5)
+dat.neurons.batch5 <- estimateDispersions(dat.neurons.batch5,cores=detectCores()-1)
+disp_table.neurons.batch5 <- dispersionTable(dat.neurons.batch5)
+disp_table.neurons.batch5$gene_id <- as.character(disp_table.neurons.batch5$gene_id)
+
+unsup_clustering_genes.neurons.batch1 <- disp_table.neurons.batch1[disp_table.neurons.batch1$dispersion_empirical >= 1.2*(disp_table.neurons.batch1$dispersion_fit),'gene_id']
+dat.neurons.batch1 <- setOrderingFilter(dat.neurons.batch1, unsup_clustering_genes.neurons.batch1)
+p.1 <- plot_ordering_genes(dat.neurons.batch1) + ggtitle("Genes Overdispersed in Batch 1")
+
+unsup_clustering_genes.neurons.batch2 <- disp_table.neurons.batch2[disp_table.neurons.batch2$dispersion_empirical >= 1.2*(disp_table.neurons.batch2$dispersion_fit),'gene_id']
+dat.neurons.batch2 <- setOrderingFilter(dat.neurons.batch2, unsup_clustering_genes.neurons.batch2)
+p.2 <- plot_ordering_genes(dat.neurons.batch2) + ggtitle("Genes Overdispersed in Batch 2")
+
+unsup_clustering_genes.neurons.batch3 <- disp_table.neurons.batch3[disp_table.neurons.batch3$dispersion_empirical >= 1.2*(disp_table.neurons.batch3$dispersion_fit),'gene_id']
+dat.neurons.batch3 <- setOrderingFilter(dat.neurons.batch3, unsup_clustering_genes.neurons.batch3)
+p.3 <- plot_ordering_genes(dat.neurons.batch3) + ggtitle("Genes Overdispersed in Batch 3")
+
+unsup_clustering_genes.neurons.batch4 <- disp_table.neurons.batch4[disp_table.neurons.batch4$dispersion_empirical >= 1.2*(disp_table.neurons.batch4$dispersion_fit),'gene_id']
+dat.neurons.batch4 <- setOrderingFilter(dat.neurons.batch4, unsup_clustering_genes.neurons.batch4)
+p.4 <- plot_ordering_genes(dat.neurons.batch4) + ggtitle("Genes Overdispersed in Batch 4")
+
+unsup_clustering_genes.neurons.batch5 <- disp_table.neurons.batch5[disp_table.neurons.batch5$dispersion_empirical >= 1.2*(disp_table.neurons.batch5$dispersion_fit),'gene_id']
+dat.neurons.batch5 <- setOrderingFilter(dat.neurons.batch5, unsup_clustering_genes.neurons.batch5)
+p.5 <- plot_ordering_genes(dat.neurons.batch5) + ggtitle("Genes Overdispersed in Batch 5")
+
+grid.arrange(p.1, p.2, p.3, p.4, p.5, nrow = 2)
+
+#calculate overall dispersions
+
+#limit to genes overdispersed in both batches and in the expressed gene set calculated earlier
+tmp1 <- intersect(unsup_clustering_genes.neurons.batch1, unsup_clustering_genes.neurons.batch2)
+tmp2 <- intersect(tmp1, unsup_clustering_genes.neurons.batch3)
+tmp3 <- intersect(tmp2, unsup_clustering_genes.neurons.batch4)
+unsup_clustering_genes.neurons <- intersect(tmp3, unsup_clustering_genes.neurons.batch5)
+length(unsup_clustering_genes.neurons)
+# 1.2 = 477
+
+dat.neurons.expressed.normalized <- estimateSizeFactors(dat.neurons.expressed.normalized)
+dat.neurons.expressed.normalized <- estimateDispersions(dat.neurons.expressed.normalized,cores=detectCores()-1)
+disp_table.neurons <- dispersionTable(dat.neurons.expressed.normalized)
+disp_table.neurons$gene_id <- as.character(disp_table.neurons$gene_id)
+
+dat.neurons.expressed.normalized <- setOrderingFilter(dat.neurons.expressed.normalized, unsup_clustering_genes.neurons)
+p.intersect <- plot_ordering_genes(dat.neurons.expressed.normalized) + ggtitle("Genes Overdispersed in All Batches")
+
+grid.arrange(p.1, p.2, p.3, p.4, p.5, p.intersect, ncol = 3)
+```
+
+```{r neuron_PCA}
+neurons.pca <- prcomp(t(log10(exprs(dat.neurons.expressed.normalized) + 1)), scale = T, center = T)
+
+screeplot(neurons.pca, type = "lines", npcs = 20)
+
+ggbiplot(neurons.pca, var.axes = F, groups = pData(dat.neurons[neuron_expressed_genes,])$batch, ellipse = T) + 
+  scale_color_brewer("Batch", palette = "Set1") + 
+  ggtitle("PCA on 13,403 expressed genes in the neuron subset\nPost-normalization") + 
+  theme(aspect.ratio = 1)
+```
+
+```{r UMAP_neurons}
+embedding <- umap(t(log10(exprs(dat.neurons.expressed.normalized) + 1)), n_neighbors = 15L)
+
+pData(dat.neurons.expressed.normalized)$UMAP1 <- embedding$UMAP1
+pData(dat.neurons.expressed.normalized)$UMAP2 <- embedding$UMAP2
+
+ggplot(pData(dat.neurons.expressed.normalized), aes(x = UMAP1, y = UMAP2, color = batch)) +
+  geom_point(size = 1) +
+  stat_ellipse() +
+  scale_color_brewer("Batch", palette = "Set1") +
+  theme_classic() +
+  ggtitle("Umap on 13,403 expressed genes in the neuron subset")
+
+#embedding <- umap(t(log10(exprs(dat.neurons[unsup_clustering_genes_intersect.neurons,]) + 1)), n_neighbors = 30L, random_state = 100L, min_dist = 0.01, spread = 5, n_epochs = 5000, local_connectivity = 5L)
+
+embedding <- umap(t(log10(exprs(dat.neurons.expressed.normalized[unsup_clustering_genes_intersect.neurons,]) + 1)), n_neighbors = 30L, random_state = 100L, min_dist = 0.01, spread = 5, n_epochs = 2000, local_connectivity = 4L)
+
+pData(dat.neurons.expressed.normalized)$UMAP1 <- embedding$UMAP1
+pData(dat.neurons.expressed.normalized)$UMAP2 <- embedding$UMAP2
+
+ggplot(pData(dat.neurons.expressed.normalized), aes(x = UMAP1, y = UMAP2, color = batch)) +
+  geom_point() +
+  stat_ellipse() +
+  scale_color_brewer(palette = "Set1")
+  
+#ggplot(pData(dat.neurons.expressed.normalized), aes(x = UMAP1, y = UMAP2, color = genotype)) +
+#  geom_point(size = 1) +
+#  scale_color_brewer(palette = "Set1") +
+#  theme_classic() +
+#  ggtitle("Umap on 335 high-variance expressed genes\nNeuron subset")
+
+#UMAP on PCA on overdispersed genes
+
+neurons_unsup_clustering.pca <- prcomp(t(log10(exprs(dat.neurons.expressed.normalized)[unsup_clustering_genes.neurons,] + 1)), scale = T, center = T)
+
+screeplot(neurons_unsup_clustering.pca, type = "lines", npcs = 20)
+
+ggbiplot(neurons_unsup_clustering.pca, var.axes = F, groups = pData(dat.neurons)$batch, ellipse = T) + 
+  scale_color_brewer("Batch", palette = "Set1") + 
+  ggtitle("PCA on 477 genes overdispersed in the neuron subset\nPost-normalization") + 
+  theme(aspect.ratio = 1)
+
+#Ignore PC2 -- batch
+#pca.embedding <- umap(neurons_unsup_clustering.pca$x[, c(1, 3:9)], random_state = 1L, n_neighbors = 15L, spread = 3)
+
+#pca.embedding <- umap(neurons_unsup_clustering.pca$x[, c(1, 3:9)], random_state = 1L, n_neighbors = 15L, spread = 5)
+
+#pca.embedding <- umap(neurons_unsup_clustering.pca$x[, c(1, 3:9)], random_state = 1L, n_neighbors = 15L, spread = 4)
+
+#pca.embedding <- umap(neurons_unsup_clustering.pca$x[, c(1, 3:9)], random_state = 1L, n_neighbors = 15L, spread = 3, min_dist = 0.05)
+
+pca.embedding <- umap(neurons_unsup_clustering.pca$x[, c(1, 3:9)], random_state = 1L, n_neighbors = 15L, spread = 4, min_dist = 0.01)
+
+pData(dat.neurons.expressed.normalized)$UMAP1 <- pca.embedding$UMAP1
+pData(dat.neurons.expressed.normalized)$UMAP2 <- pca.embedding$UMAP2
+
+ggplot(pData(dat.neurons.expressed.normalized), aes(x = UMAP1, y = UMAP2, color = batch)) +
+  geom_point() +
+  stat_ellipse() +
+  scale_color_brewer(palette = "Set1")
+
+ggplot(pData(dat.neurons.expressed.normalized), aes(x = UMAP1, y = UMAP2, color = CellType)) +
+  geom_point() +
+  stat_ellipse() +
+  scale_color_brewer(palette = "Set1")
+
+ggplot(pData(dat.neurons.expressed.normalized), aes(x = UMAP1, y = UMAP2, color = genotype)) +
+  geom_point() +
+  stat_ellipse() +
+  scale_color_brewer(palette = "Set1")
+
+ggplot(pData(dat.neurons.expressed.normalized), aes(x = UMAP1, y = UMAP2, color = sex)) +
+  geom_point() +
+  stat_ellipse() +
+  scale_color_brewer(palette = "Set1")
+
+pData(dat.neurons)$UMAP1 <- pca.embedding$UMAP1
+pData(dat.neurons)$UMAP2 <- pca.embedding$UMAP2
+```
+
+```{r Mclust_clustering_neurons}
+m <- Mclust(data = pData(dat.neurons)[c("UMAP1", "UMAP2")], G = 9)
+plot(m)
+pData(dat.neurons)$cluster <- as.factor(m$classification)
+
+ggplot(pData(dat.neurons), aes(x = UMAP1, y = UMAP2, color = cluster)) +
+  geom_point(size = 1) +
+#  scale_color_brewer(palette = "Set1") +
+  theme_classic()
+```
+# DDRTree
+```{r DDRTree_on_neurons}
+dat.neurons <- reduceDimension(dat.neurons,max_components=7,reduction_method="DDRTree",norm_method="log",residualModelFormulaStr="~batch",maxIter=2000,tol=1e-15)
+dat.neurons <- orderCells(dat.neurons)
+dat.neurons <- orderCells(dat.neurons, root_state = 5)
+plot_complex_cell_trajectory(dat.neurons, color_by = "State")
+ggplot(pData(dat.neurons), aes(x = UMAP1, y = UMAP2, color = State)) +
+  geom_point()
+
+grid.arrange(
+  plot_complex_cell_trajectory(dat.neurons, color_by = "CellType") + scale_color_brewer(palette = "Set1") + guides(color = guide_legend(nrow = 5)) + theme(legend.position = "left"), 
+  plot_complex_cell_trajectory(dat.neurons, color_by = "State") + guides(color = guide_legend(ncol = 5)) + theme(legend.position = "left")
+)
+
+#pdf("Neuronal_DDRTree.pdf")
+plot_complex_cell_trajectory(dat.neurons,color="CellType") + 
+  scale_color_brewer(palette = "Set1") +
+  labs(title="Neuronal Trajectories",color="Cell Type")
+#dev.off()
+
+grid.arrange(plot_complex_cell_trajectory(dat.neurons, color_by = "State") + theme(legend.position = "none"),
+  ggplot(pData(dat.neurons), aes(x = UMAP1, y = UMAP2, color = State)) +
+  geom_point(size = 1) +
+  theme_classic(), ncol = 2
+  )
+```
+
+```{r BEAM_on_neuron_branches}
+neuron_BEAM1 <- BEAM(dat.neurons[neuron_expressed_genes,], fullModelFormulaStr="~ batch + sm.ns(Pseudotime, df = 3)*Branch",reducedModelFormulaStr = "~ batch + sm.ns(Pseudotime, df = 3)", cores = detectCores()-1,branch_point = 1)
+neuron_BEAM1_sigGenes<-rownames(neuron_BEAM1)[neuron_BEAM1$qval < 0.01]
+
+plot_genes_branched_heatmap(dat.neurons[neuron_BEAM1_sigGenes,],branch_point=1,show_rownames=TRUE,cluster_rows = F,norm_method = "vstExprs", branch_labels = c("State 2 (Het-specific)","All others"))
+
+# Ccnd2 = G1/S transition
+# Top2a = S phase
+# Birc5 = Apoptosis inhibition, G2/M transition
+# Cdk1 = G2/M transition
+# Cdc20 = anaphase-promoting
+# Ube2c = anaphase-promoting
+
+# Other interesting genes:
+# Cartpt
+# Isl1
+# Sncg
+# Meg3
+# Stmn4
+# Gal
+# Cck
+# Ednrb
+# Gfra1
+  # Signaling by Gdnf promotes survival of dopaminergic neurons
+# Gfra2
+  # Signaling by Nrtn promotes survival of basal forebrain cholinergic neurons and spinal motor neurons
+# Gfra3
+  # Signaling by Artn used for chronic pain treatment
+# Gfra4
+  # Signaling by Pspn promotes survival of basal forebrain cholinergic neurons
+# S100a10
+# Scn3b
+# Ass1
+
+neuron_BEAM2 <- BEAM(dat.neurons[neuron_expressed_genes,], fullModelFormulaStr="~ batch + sm.ns(Pseudotime, df = 3)*Branch",reducedModelFormulaStr = "~ batch + sm.ns(Pseudotime, df = 3)", cores = detectCores()-1,branch_point = 2)
+neuron_BEAM2_sigGenes<-rownames(neuron_BEAM2)[neuron_BEAM2$qval < 0.01]
+
+plot_genes_branched_heatmap(dat.neurons[neuron_BEAM2_sigGenes,],branch_point=2,show_rownames=TRUE,cluster_rows = F,norm_method = "vstExprs", branch_labels = c("Acetylcholinergic neurons", "Noradrenergic neurons")) 
+```
+
+```{r BEAM_on_neuron_states}
+neuron_BEAM3 <- BEAM(dat.neurons[neuron_expressed_genes,], fullModelFormulaStr="~ batch + sm.ns(Pseudotime, df = 3)*Branch",reducedModelFormulaStr = "~ batch + sm.ns(Pseudotime, df = 3)", cores = detectCores()-1,branch_states = c(2, 5))
+neuron_BEAM3_sigGenes<-rownames(neuron_BEAM3)[neuron_BEAM3$qval < 0.01]
+
+# Sema6a
+# Gata3
+# Etv1
+# Tcf7l2
+# Trib2
+# Sytl4
+# Klhl32
+# Chst8
+# Nrg1
+# Ntng1
+
+plot_genes_branched_heatmap(dat.neurons[neuron_BEAM3_sigGenes,],show_rownames=TRUE,cluster_rows = F,norm_method = "vstExprs", branch_labels = c("State 2", "State 5")) 
+```
+
+### Differential test WRT genotype
+```{r}
+neuron_genotype_diff_test <-  differentialGeneTest(dat.neurons[neuron_expressed_genes,], fullModelFormulaStr = "~batch + sex + CellType + genotype", reducedModelFormulaStr = "~batch + sex + CellType", cores=detectCores()-1)
+
+neuron_genotype_diff_test_sorted <- neuron_genotype_diff_test[order(neuron_genotype_diff_test$qval),]
+
+neuron_genotype_diff_test_sigGenes <- rownames(neuron_genotype_diff_test_sorted[neuron_genotype_diff_test_sorted$qval < 0.01,])
+
+tmp <- t(scale(t(exprs(dat.neurons[neuron_genotype_diff_test_sigGenes,])),scale = T, center = T))
+heatmap_data <- log(tmp - min(tmp) + 1)
+
+myLower <- (0)
+myUpper <- (2.3)
+
+heatmap_data[heatmap_data < myLower] <- myLower
+heatmap_data[heatmap_data > myUpper] <- myUpper
+
+rownames(heatmap_data) <- lookupGeneName(dat.neurons, rownames(heatmap_data))
+
+heatmap_annotation <- pData(dat.neurons)[,c("CellType","genotype","sex","cluster")]
+
+writeLines(paste0('c("',paste(levels(pData(dat.neurons)$Cluster),brewer.pal(9, "Set1"),sep='" = "', collapse='", "'),'")'))
+#writeLines(paste0('c("',paste(levels(pData(dat.filtered)$genotype),brewer.pal(3, "Accent")[1:2],sep='" = "', collapse='", "'),'")'))
+
+heatmap_colors <- list(
+"Cell Type" =  c("Neuron" = "#377eb8", "Transition Cell" = "#FF7F00", "Acetylcholinergic Neuron" = "#e41a1c", "Noradrenergic Neuron" = "#4DAF4A"),
+"Genotype" = c("het" = "#7FC97F", "hom" = "#BEAED4"),
+"Sex" = c("female"="black","male"="gray70"),
+"Cluster" = c("1" = "#E41A1C", "2" = "#377EB8", "3" = "#4DAF4A", "4" = "#984EA3", "5" = "#FF7F00", "6" = "#FFFF33", "7" = "#A65628", "8" = "#F781BF", "9" = "#999999"))
+
+colnames(heatmap_annotation) <- c("Cell Type", "Genotype", "Sex", "Cluster")
+
+pdf("Heatmap_neurons_wrt_genotype.pdf", height = 22, width = 17)
+pheatmap(mat = heatmap_data,
+         scale = "none",
+         show_rownames = TRUE,
+         show_colnames = FALSE,
+         drop_levels = FALSE,
+         #breaks = seq(myLower, myUpper, length = 100),
+         annotation_col = heatmap_annotation,
+         annotation_colors = heatmap_colors,
+         annotation_names_col = TRUE,
+         annotation_legend = TRUE,
+         border_color = NA,
+         main = "Neurons\n84 Genes, 1% FDR\nFull model: ~ genotype + CellType + sex + batch\nReduced model: ~ CellType + sex + batch"
+         )
+dev.off()
+
+neuron_genotype_gene_names <- lookupGeneName(dat.filtered, neuron_genotype_diff_test_sigGenes)
+
+neuron_het_means <- apply(exprs(dat.neurons)[neuron_genotype_diff_test_sigGenes, pData(dat.neurons)$genotype == "het"], 1, mean)
+neuron_hom_means <- apply(exprs(dat.neurons)[neuron_genotype_diff_test_sigGenes,pData(dat.neurons)$genotype == "hom"], 1,mean)
+
+neuron_genotype_relative_exprs <- neuron_het_means/neuron_hom_means
+
+neuron_upregulated_in_het <- names(neuron_genotype_relative_exprs[neuron_genotype_relative_exprs > 1 | neuron_genotype_relative_exprs == "Inf"])
+
+neuron_downregulated_in_het <- names(neuron_genotype_relative_exprs[neuron_genotype_relative_exprs < 1])
+
+egENSEMBL <- toTable(org.Mm.egENSEMBL)
+
+neuron_upregulated_in_het_entrez <- gsub("\\..*","", neuron_upregulated_in_het)
+m<-match(neuron_upregulated_in_het_entrez,egENSEMBL$ensembl_id)
+neuron_upregulated_in_het_entrez <- egENSEMBL$gene_id[m]
+ego_neuron_upregulated <- enrichGO(gene = neuron_upregulated_in_het_entrez,
+                OrgDb =       'org.Mm.eg.db',
+                ont           = "BP",
+                pAdjustMethod = "BH",
+                pvalueCutoff  = 0.05,
+                qvalueCutoff  = 1, 
+                readable      = TRUE)
+
+neuron_downregulated_in_het_entrez <- gsub("\\..*","",neuron_downregulated_in_het)
+m<-match(neuron_downregulated_in_het_entrez,egENSEMBL$ensembl_id)
+neuron_downregulated_in_het_entrez <- egENSEMBL$gene_id[m]
+ego_neuron_downregulated <- enrichGO(gene = neuron_downregulated_in_het_entrez,
+                OrgDb =       'org.Mm.eg.db',
+                ont           = "BP",
+                pAdjustMethod = "BH",
+                pvalueCutoff  = 0.05,
+                qvalueCutoff  = 1, 
+                readable      = TRUE)
+```
+
+# Genotype:sex differential test
+```{r}
+neuron_genotype_sex_diff_test <-  differentialGeneTest(dat.neurons[neuron_expressed_genes,], fullModelFormulaStr = "~batch + CellType + genotype*sex", reducedModelFormulaStr = "~batch + CellType + genotype + sex", cores=detectCores()-1)
+
+neuron_genotype_sex_diff_test_sorted <- neuron_genotype_sex_diff_test[order(neuron_genotype_sex_diff_test$qval),]
+
+neuron_genotype_sex_diff_test_sigGenes <- rownames(neuron_genotype_sex_diff_test_sorted[neuron_genotype_sex_diff_test_sorted$qval < 0.01,])
+
+tmp <- t(scale(t(exprs(dat.neurons[neuron_genotype_sex_diff_test_sigGenes,])),scale = T, center = T))
+heatmap_data <- log(tmp - min(tmp) + 1)
+
+myLower <- (0)
+myUpper <- (2.3)
+
+heatmap_data[heatmap_data < myLower] <- myLower
+heatmap_data[heatmap_data > myUpper] <- myUpper
+
+rownames(heatmap_data) <- lookupGeneName(dat.neurons, rownames(heatmap_data))
+
+heatmap_annotation <- pData(dat.neurons)[,c("CellType","genotype","sex","cluster")]
+
+writeLines(paste0('c("',paste(levels(pData(dat.neurons)$Cluster),brewer.pal(9, "Set1"),sep='" = "', collapse='", "'),'")'))
+#writeLines(paste0('c("',paste(levels(pData(dat.filtered)$genotype),brewer.pal(3, "Accent")[1:2],sep='" = "', collapse='", "'),'")'))
+
+heatmap_colors <- list(
+"Cell Type" =  c("Neuron" = "#377eb8", "Transition Cell" = "#FF7F00", "Acetylcholinergic Neuron" = "#e41a1c", "Noradrenergic Neuron" = "#4DAF4A"),
+"Genotype" = c("het" = "#7FC97F", "hom" = "#BEAED4"),
+"Sex" = c("female"="black","male"="gray70"),
+"Cluster" = c("1" = "#E41A1C", "2" = "#377EB8", "3" = "#4DAF4A", "4" = "#984EA3", "5" = "#FF7F00", "6" = "#FFFF33", "7" = "#A65628", "8" = "#F781BF", "9" = "#999999"))
+
+colnames(heatmap_annotation) <- c("Cell Type", "Genotype", "Sex", "Cluster")
+
+pdf("Heatmap_neurons_wrt_genotype.pdf", height = 22, width = 17)
+pheatmap(mat = heatmap_data,
+         scale = "none",
+         show_rownames = TRUE,
+         show_colnames = FALSE,
+         drop_levels = FALSE,
+         #breaks = seq(myLower, myUpper, length = 100),
+         annotation_col = heatmap_annotation,
+         annotation_colors = heatmap_colors,
+         annotation_names_col = TRUE,
+         annotation_legend = TRUE,
+         border_color = NA,
+         main = "Neurons\n84 Genes, 1% FDR\nFull model: ~ genotype + CellType + sex + batch\nReduced model: ~ CellType + sex + batch"
+         )
+dev.off()
+```
+
+```{r}
+cluster6_genotype_diff_test <-  differentialGeneTest(dat.neurons[neuron_expressed_genes, pData(dat.neurons)$Cluster == 6], fullModelFormulaStr = "~batch + genotype", reducedModelFormulaStr = "~batch", cores=detectCores()-1)
+
+cluster6_genotype_diff_test_sorted <- cluster6_genotype_diff_test[order(cluster6_genotype_diff_test$pval),]
+
+cluster6_genotype_diff_test_sigGenes <- rownames(cluster6_genotype_diff_test_sorted[cluster6_genotype_diff_test_sorted$pval < 0.05/length(neuron_expressed_genes),])
+```
+
+```{r}
+neuron_bifurcation_diff_test <-  differentialGeneTest(dat.neurons[neuron_expressed_genes, pData(dat.neurons)$Cluster %in% c(4, 6)], fullModelFormulaStr = "~batch + Cluster", reducedModelFormulaStr = "~batch", cores=detectCores()-1)
+
+neuron_bifurcation_diff_test_sorted <- neuron_bifurcation_diff_test[order(neuron_bifurcation_diff_test$pval),]
+
+neuron_bifurcation_diff_test_sigGenes <- neuron_bifurcation_diff_test_sorted[neuron_bifurcation_diff_test_sorted$qval < 3.5e-6,]
+
+#neuron_bifurcation_diff_test_sigGenes <- rownames(neuron_bifurcation_diff_test_sorted[neuron_bifurcation_diff_test_sorted$pval < 0.05/length(neuron_expressed_genes),])
+```
+
+```{r}
+genotype_across_bifurcation <- differentialGeneTest(dat.neurons[neuron_expressed_genes, pData(dat.neurons)$Cluster %in% c(4, 6)], fullModelFormulaStr = "~batch + Cluster + genotype", reducedModelFormulaStr = "~batch + genotype", cores=detectCores()-1)
+
+genotype_across_bifurcation_sorted <- genotype_across_bifurcation[order(genotype_across_bifurcation$pval),]
+
+genotype_across_bifurcation_sigGenes <- genotype_across_bifurcation_sorted[genotype_across_bifurcation_sorted$pval < 3.5e-6,]
+
+genes_for_GSEA <- str_replace(genotype_across_bifurcation_sigGenes$gene_id, pattern = "[.][0-9]+$", replacement = "")
+
+write.table(as.data.frame(genes_for_GSEA), "genes_for_GSEA.txt", row.names = F)
+```
+
+### Differential test WRT cluster
+```{r}
+plotUMAP(dat.filtered, color = "cluster") +
+  geom_point(size = 1) +
+  scale_color_manual("Cluster", values = colorRampPalette(brewer.pal(7, "Set1"))(11)[c(4:6, 1, 7:9, 2, 3, 10, 11)], guide = guide_legend(ncol=3)) +
+  theme_classic() +
+  theme(legend.position = c(0.8, 0.2), aspect.ratio = 1, legend.direction = "vertical")
+
+kplotUMAP(dat.filtered[,pData(dat.filtered)$cluster %in% c(4, 9)], color = "cluster") + 
+  scale_color_brewer("Cluster", palette = "Set1") +
+  theme_classic() +
+  theme(legend.position = "bottom", aspect.ratio = 1)
+
+bifurcation_diff_test <- differentialGeneTest(dat.filtered[expressed_genes,pData(dat.filtered)$cluster %in% c(4, 9)], fullModelFormulaStr = "~batch + cluster", reducedModelFormulaStr = "~batch", cores=detectCores()-1)
+
+bifurcation_diff_test_sorted <- bifurcation_diff_test[order(bifurcation_diff_test$pval),]
+
+sig_genes <- bifurcation_diff_test_sorted[bifurcation_diff_test_sorted$qval < 0.05, c("gene_short_name")]
+
+to_plot <- c("Gal", "Cartpt", "Etv1", "Vip", "Th", "Gfra1", "Npy")
+bifurcation_expr <- exprs(dat.filtered[lookupGeneId(dat.filtered, to_plot), pData(dat.filtered)$cluster %in% c(4, 9)])
+bifurcation_expr <- t(bifurcation_expr)
+tmp_df <- merge(bifurcation_expr, pData(dat.filtered)[pData(dat.filtered)$cluster %in% c(4, 9), "cluster", drop = F], by = 0)
+row.names(tmp_df) <- tmp_df[,1]
+tmp_df <- tmp_df[,-1]
+melted_df <- melt(tmp_df)
+
+ggplot(melted_df) +
+  geom_col(aes(x = variable, y = log10(value + 1), fill = cluster), position = "dodge") +
+  scale_fill_manual("Cluster", values = c("#E41A1C", "#3B87A2")) + 
+  scale_x_discrete(labels = lookupGeneName(dat.filtered, as.character(melted_df$variable))) +
+  scale_y_continuous("Log10(CPC + 1)", expand = c(0, 0)) +
+  theme(axis.title.x = element_blank(), legend.position = c(0.8, 0.9))
+
+
+neuron_cluster_diff_test <-  differentialGeneTest(dat.neurons[neuron_expressed_genes,], fullModelFormulaStr = "~batch + Cluster", reducedModelFormulaStr = "~batch", cores=detectCores()-1)
+
+neuron_cluster_diff_test_sorted <- neuron_cluster_diff_test[order(neuron_cluster_diff_test$pval),]
+
+fold_change <- esApply(dat.neurons[neuron_expressed_genes,pData(dat.neurons)$genotype == "hom"], 1, mean)/esApply(dat.neurons[neuron_expressed_genes,pData(dat.neurons)$genotype == "het"], 1, mean)
+
+neuron_cluster_diff_test_merged <- merge(neuron_cluster_diff_test_sorted, as.data.frame(fold_change), by = 0)
+
+ggplot(neuron_cluster_diff_test_merged) +
+   geom_histogram(aes(x=pval))
+
+ggplot(neuron_cluster_diff_test_merged) +
+  geom_point(aes(y = -log10(pval), x=log10(fold_change), color = ifelse((log2(fold_change) > 2 | log2(fold_change) < -2) & -log10(pval) > 5, "significant","n.s.")))
+
+neuron_cluster_diff_test_merged[(log2(neuron_cluster_diff_test_merged$fold_change) > 2 | log2(neuron_cluster_diff_test_merged$fold_change) < -2) & -log10(neuron_cluster_diff_test_merged$pval) > 5,]
+
+neuron_cluster_diff_test_sigGenes <- neuron_cluster_diff_test_merged[(log2(neuron_cluster_diff_test_merged$fold_change) > 2 | log2(neuron_cluster_diff_test_merged$fold_change) < -2) & !neuron_cluster_diff_test_merged$fold_change == 0 & neuron_cluster_diff_test_merged$pval < .05/length(neuron_expressed_genes),"Row.names"]
+
+# Btbd17 
+# Maoa involved in the breakdown of the neurotransmitters serotonin, epinephrine, norepinephrine, and dopamine
+# Syn2 implicated in synaptogenesis and the modulation of neurotransmitter release
+# Pmp22 component of myelin
+# Oprl1 functions as a receptor for the endogenous, opioid-related neuropeptide, nociceptin/orphanin FQ.
+# Sgpp2 degrades the bioactive signaling molecule sphingosine 1-phosphate. The encoded protein is induced during inflammatory responses and has been shown to be downregulated by the microRNA-31 tumor suppressor
+# Rapgef4, Rapgef5
+# Gch1 enzyme involved in production of BH4, which in turn is involved in production of seratonin and dopamine
+# Scn3b
+# Ldoc1, 
+  # Ntrk3 (may play a role in the development of proprioceptive neurons that sense body position)
+  # Ryr3
+  # Pcp4
+
+tmp<-t(scale(t(exprs(dat.neurons[neuron_cluster_diff_test_sigGenes,])),scale=T,center=T))
+heatmap_data<-log(tmp -min(tmp) + 1)
+
+myLower<-(0)
+myUpper<-(2.3)
+
+heatmap_data[heatmap_data<myLower]<-myLower
+heatmap_data[heatmap_data>myUpper]<-myUpper
+
+rownames(heatmap_data)<-lookupGeneName(dat.neurons,rownames(heatmap_data))
+
+heatmap_annotation<-pData(dat.neurons)[,c("CellType","genotype","sex","Cluster")]
+
+#writeLines(paste0('c("',paste(levels(pData(dat.neurons)$Cluster),brewer.pal(4, "Set1"),sep='" = "', collapse='", "'),'")'))
+#writeLines(paste0('c("',paste(levels(pData(dat.filtered)$genotype),brewer.pal(3, "Accent")[1:2],sep='" = "', collapse='", "'),'")'))
+
+heatmap_colors<-list(
+"Cell Type" =  c("Acetylcholinergic Neuron"="#377eb8", "Ambiguous"="#999999", "Neuron"="#e41a1c", "Noradrenergic Neuron"="#984ea3"),
+"Genotype" = c("het" = "#7FC97F", "hom" = "#BEAED4"),
+"Sex" = c("female"="black","male"="gray70"),
+"Cluster" = c("1" = "#E41A1C", "2" = "#377EB8", "3" = "#4DAF4A", "4" = "#984EA3", "5" = "#FF7F00", "6" = "#FFFF33", "7" = "#A65628", "1" = "#F781BF", "2" = "#999999"))
+
+colnames(heatmap_annotation)<-c("Cell Type","Genotype","Sex","Cluster")
+
+pdf("Heatmap_neurons_wrt_cluster.pdf",height=10,width=17)
+pheatmap(mat = heatmap_data,
+         scale="none",
+         show_rownames=TRUE,
+         show_colnames=FALSE,
+         drop_levels=FALSE,
+         breaks=seq(myLower,myUpper,length=100),
+         annotation_col=heatmap_annotation,
+         annotation_colors=heatmap_colors,
+         annotation_names_col=TRUE,
+         annotation_legend=TRUE,
+         border_color = NA
+         )
+dev.off()
+```
+
+#State Specificity
+```{r RNAScope Genes}
+# Look at both cluster and state specificity (should see a fair amount of overlap)
+
+melted_df <- melt(exprs(dat.neurons))
+colnames(melted_df) <- c("gene_id","cell_id","value")
+melted_df <- merge(melted_df, pData(dat.neurons)[,c("State","Cluster")], by.x = "cell_id", by.y = 0)
+
+mean_expr_cluster <- melted_df %>%
+  group_by(Cluster, gene_id) %>%
+  summarise(mean_expression_cluster = mean(value)) %>%
+  as.data.frame()
+
+mean_expr_cluster <- dcast(mean_expr_cluster, gene_id ~ Cluster)
+rownames(mean_expr_cluster) <- mean_expr_cluster$gene_id
+mean_expr_cluster <- mean_expr_cluster[,-1]
+
+mean_expr_state <- melted_df %>%
+  group_by(State, gene_id) %>%
+  summarise(mean_expression_state = mean(value)) %>%
+  as.data.frame()
+
+mean_expr_state <- dcast(mean_expr_state, gene_id ~ State)
+rownames(mean_expr_state) <- mean_expr_state$gene_id
+mean_expr_state <- mean_expr_state[,-1]
+
+#Data frames of mean expression for each gene in each cluster and state, respectively
+
+neuron_cluster_specificity <- cummeRbund:::.specificity(mean_expr_cluster)
+neuron_state_specificity <- cummeRbund:::.specificity(mean_expr_state)
+
+
+melted_cluster_specificity<-melt(neuron_cluster_specificity)
+mean_expr_cluster_melted <- melt(mean_expr_cluster)
+names(mean_expr_cluster_melted) <- c("cluster","mean_expr")
+mean_expr_cluster_melted$gene_id <- rep(row.names(mean_expr_cluster), 7)
+melted_cluster_specificity$Var2 <- as.numeric(str_extract(melted_cluster_specificity$Var2, pattern = "[0-9]"))
+names(melted_cluster_specificity) <- c("gene_id", "cluster", "specificity")
+neuron_cluster_specificity <- merge(melted_cluster_specificity, mean_expr_cluster_melted, by = c("gene_id", "cluster"))
+
+ggplot(neuron_cluster_specificity) +
+  geom_point(aes(x = log10(mean_expr + 1), y = specificity)) +
+  facet_wrap(~ cluster) +
+  ggtitle("Specificity by Cluster")
+
+neuron_cluster_specific_genes <- neuron_cluster_specificity %>%
+  filter(specificity > 0.5, mean_expr > 1, gene_id %in% neuron_expressed_genes)
+
+neuron_cluster_specific_genes$gene_short_name <- lookupGeneName(dat.neurons, neuron_cluster_specific_genes$gene_id)
+
+neuron_cluster_specific_genes <- neuron_cluster_specific_genes %>%
+  select(gene_id, gene_short_name, cluster, specificity, mean_expr)
+
+neuron_cluster_specific_genes <- neuron_cluster_specific_genes[order(neuron_cluster_specific_genes$cluster),]
+
+melted_state_specificity<-melt(neuron_state_specificity)
+mean_expr_state_melted <- melt(mean_expr_state)
+names(mean_expr_state_melted) <- c("state","mean_expr")
+mean_expr_state_melted$gene_id <- rep(row.names(mean_expr_state), 8)
+melted_state_specificity$Var2 <- as.numeric(str_extract(melted_state_specificity$Var2, pattern = "[0-9]"))
+names(melted_state_specificity) <- c("gene_id", "state", "specificity")
+neuron_state_specificity <- merge(melted_state_specificity, mean_expr_state_melted, by = c("gene_id", "state"))
+
+ggplot(neuron_state_specificity) +
+  geom_point(aes(x = log10(mean_expr + 1), y = specificity)) +
+  facet_wrap(~ state) +
+  ggtitle("Specificity by State")
+
+neuron_state_specific_genes <- neuron_state_specificity %>%
+  filter(specificity > 0.5, mean_expr > 1, gene_id %in% neuron_expressed_genes)
+
+neuron_state_specific_genes$gene_short_name <- lookupGeneName(dat.neurons, neuron_state_specific_genes$gene_id)
+
+neuron_state_specific_genes <- neuron_state_specific_genes %>%
+  select(gene_id, gene_short_name, state, specificity, mean_expr)
+
+neuron_state_specific_genes <- neuron_state_specific_genes[order(neuron_state_specific_genes$state),]
+```
+
+### Subset Glia
+```{r glia_gene_selection}
+dat.glia<-dat.filtered[,pData(dat.filtered)$CellType %in% c("Progenitor/Glia","Transition Cell")]
+# 591 cells
+
+dat.glia@dim_reduce_type<-"DDRTree"
+dat.glia@auxOrderingData<-new.env()
+dat.glia<-estimateSizeFactors(dat.glia)
+dat.glia<-estimateDispersions(dat.glia)
+
+fData(dat.glia)$num_cells_expressed <- rowSums(exprs(dat.glia) > 0)
+fData(dat.glia)$mean_expr<-esApply(dat.glia,1,function(x){mean(x)})
+fData(dat.glia)$sd_expr<-esApply(dat.glia,1,function(x){sd(x)})
+fData(dat.glia)$bcv<-
+  (fData(dat.glia)$sd_expr/fData(dat.glia)$mean_expr)**2
+fData(dat.glia)$percent_detection<-
+  (fData(dat.glia)$num_cells_expressed/dim(dat.glia)[2])*100
+
+glia_expressed_genes<-rownames(fData(dat.glia)[fData(dat.glia)$num_cells_expressed > 10 &fData(dat.glia)$sd_expr > 1e-20,])
+#Expressed in at least 10 cells at > 0 CPC with SD > 0
+#14032 genes
+
+dat.glia.batch1<-dat.glia[,pData(dat.glia)$batch == "HD01"]
+dat.glia.batch1<-estimateSizeFactors(dat.glia.batch1)
+dat.glia.batch1<-estimateDispersions(dat.glia.batch1,cores=detectCores()-1)
+disp_table.glia.batch1 <- dispersionTable(dat.glia.batch1)
+disp_table.glia.batch1$gene_id<-as.character(disp_table.glia.batch1$gene_id)
+unsup_clustering_genes.glia.batch1 <- disp_table.glia.batch1[disp_table.glia.batch1$dispersion_empirical >= 1.4*(disp_table.glia.batch1$dispersion_fit),'gene_id']
+dat.glia.batch1 <- setOrderingFilter(dat.glia.batch1, unsup_clustering_genes.glia.batch1)
+p.1<-plot_ordering_genes(dat.glia.batch1) + ggtitle("Genes Overdispersed in Batch 1 - Glia Subset")
+
+dat.glia.batch2<-dat.glia[,pData(dat.glia)$batch == "HD02"]
+dat.glia.batch2<-estimateSizeFactors(dat.glia.batch2)
+dat.glia.batch2<-estimateDispersions(dat.glia.batch2,cores=detectCores()-1)
+disp_table.glia.batch2 <- dispersionTable(dat.glia.batch2)
+disp_table.glia.batch2$gene_id<-as.character(disp_table.glia.batch2$gene_id)
+unsup_clustering_genes.glia.batch2 <- disp_table.glia.batch2[disp_table.glia.batch2$dispersion_empirical >= 1.4*(disp_table.glia.batch2$dispersion_fit),'gene_id']
+dat.glia.batch2 <- setOrderingFilter(dat.glia.batch2, unsup_clustering_genes.glia.batch2)
+p.2<-plot_ordering_genes(dat.glia.batch2) + ggtitle("Genes Overdispersed in Batch 2 - Glia Subset")
+
+dat.glia.batch3<-dat.glia[,pData(dat.glia)$batch == "HD03_pool_1"]
+dat.glia.batch3<-estimateSizeFactors(dat.glia.batch3)
+dat.glia.batch3<-estimateDispersions(dat.glia.batch3,cores=detectCores()-1)
+disp_table.glia.batch3 <- dispersionTable(dat.glia.batch3)
+disp_table.glia.batch3$gene_id<-as.character(disp_table.glia.batch3$gene_id)
+unsup_clustering_genes.glia.batch3 <- disp_table.glia.batch3[disp_table.glia.batch3$dispersion_empirical >= 1.4*(disp_table.glia.batch3$dispersion_fit),'gene_id']
+dat.glia.batch3 <- setOrderingFilter(dat.glia.batch3, unsup_clustering_genes.glia.batch3)
+p.3<-plot_ordering_genes(dat.glia.batch3) + ggtitle("Genes Overdispersed in Batch 3 - Glia Subset")
+
+dat.glia.batch4<-dat.glia[,pData(dat.glia)$batch == "HD03_pool_2"]
+dat.glia.batch4<-estimateSizeFactors(dat.glia.batch4)
+dat.glia.batch4<-estimateDispersions(dat.glia.batch4,cores=detectCores()-1)
+disp_table.glia.batch4 <- dispersionTable(dat.glia.batch4)
+disp_table.glia.batch4$gene_id<-as.character(disp_table.glia.batch4$gene_id)
+unsup_clustering_genes.glia.batch4 <- disp_table.glia.batch4[disp_table.glia.batch4$dispersion_empirical >= 1.4*(disp_table.glia.batch4$dispersion_fit),'gene_id']
+dat.glia.batch4 <- setOrderingFilter(dat.glia.batch4, unsup_clustering_genes.glia.batch4)
+p.4<-plot_ordering_genes(dat.glia.batch4) + ggtitle("Genes Overdispersed in Batch 4 - Glia Subset")
+
+dat.glia.batch5<-dat.glia[,pData(dat.glia)$batch == "HD03_pool_3"]
+dat.glia.batch5<-estimateSizeFactors(dat.glia.batch5)
+dat.glia.batch5<-estimateDispersions(dat.glia.batch5,cores=detectCores()-1)
+disp_table.glia.batch5 <- dispersionTable(dat.glia.batch5)
+disp_table.glia.batch5$gene_id<-as.character(disp_table.glia.batch5$gene_id)
+unsup_clustering_genes.glia.batch5 <- disp_table.glia.batch5[disp_table.glia.batch5$dispersion_empirical >= 1.4*(disp_table.glia.batch5$dispersion_fit),'gene_id']
+dat.glia.batch5 <- setOrderingFilter(dat.glia.batch5, unsup_clustering_genes.glia.batch5)
+p.5<-plot_ordering_genes(dat.glia.batch5) + ggtitle("Genes Overdispersed in Batch 5 - Glia Subset")
+
+grid.arrange(p.1,p.2,p.3,p.4,p.5,nrow=2)
+
+#calculate overall dispersions
+disp_table.glia<-dispersionTable(dat.glia)
+disp_table.glia$gene_id<-as.character(disp_table.glia$gene_id)
+
+#limit to genes overdispersed in both batches and in the expressed gene set calculated earlier
+tmp1 <- intersect(unsup_clustering_genes.glia.batch1, unsup_clustering_genes.glia.batch2)
+tmp2 <- intersect(tmp1, unsup_clustering_genes.glia.batch3)
+tmp3 <- intersect(tmp2, unsup_clustering_genes.glia.batch4)
+unsup_clustering_genes_intersect.glia <- intersect(tmp3, unsup_clustering_genes.glia.batch5)
+#140
+
+unsup_clustering_expressed_genes.glia<-intersect(unsup_clustering_genes_intersect.glia, glia_expressed_genes)
+#140 genes
+
+dat.glia <- setOrderingFilter(dat.glia, unsup_clustering_genes_intersect.glia)
+#p.intersect<-plot_ordering_genes(dat.glia) + ggtitle("Genes Overdispersed in All Batches")
+dat.glia <- setOrderingFilter(dat.glia, unsup_clustering_expressed_genes.glia)
+p.expressed<-plot_ordering_genes(dat.glia) + ggtitle("Genes Overdispersed in All Batches - Glia Subset\nExpressed Genes")
+
+#grid.arrange(p.1,p.2,p.3,p.4,p.5,p.intersect,p.expressed,ncol=3)
+```
+
+
+```{r}
+egENSEMBL <- toTable(org.Mm.egENSEMBL)
+
+glia_genotype_diff_test_sigGenes_entrez <- gsub("\\..*","",glia_genotype_diff_test_sigGenes)
+m<-match(glia_genotype_diff_test_sigGenes_entrez,egENSEMBL$ensembl_id)
+glia_genotype_diff_test_sigGenes_entrez <- egENSEMBL$gene_id[m]
+ego <- enrichGO(gene = glia_genotype_diff_test_sigGenes_entrez,
+                OrgDb =       'org.Mm.eg.db',
+                ont           = "BP",
+                pAdjustMethod = "none",
+                pvalueCutoff  = 0.01,
+                qvalueCutoff  = 1, 
+                readable      = TRUE)
+
+ego_MF <- enrichGO(gene = glia_genotype_diff_test_sigGenes_entrez,
+                OrgDb =       'org.Mm.eg.db',
+                ont           = "MF",
+                pAdjustMethod = "none",
+                pvalueCutoff  = 0.01,
+                qvalueCutoff  = 1, 
+                readable      = TRUE)
+
+ego_CC <- enrichGO(gene = glia_genotype_diff_test_sigGenes_entrez,
+                OrgDb =       'org.Mm.eg.db',
+                ont           = "CC",
+                pAdjustMethod = "none",
+                pvalueCutoff  = 0.01,
+                qvalueCutoff  = 1, 
+                readable      = TRUE)
+
+
+#Convert ensembl ID to entrez ID
+#Run GO enrichment
+for(i in 1:length(modNames)){
+  assign(paste0(modNames[i],"_module_genes"), gsub("\\..*","",moduleGeneSets[[i]]))
+  m<-match(get(paste0(modNames[i],"_module_genes")),egENSEMBL$ensembl_id)
+  assign(paste0(modNames[i],"_module_genes"), egENSEMBL$gene_id[m])
+  assign(paste0("ego_",modNames[i]), enrichGO(gene= get(paste0(modNames[i],"_module_genes")),
+                OrgDb =       'org.Mm.eg.db',
+                ont           = "BP",
+                pAdjustMethod = "none",
+                pvalueCutoff  = 0.01,
+                qvalueCutoff  = 1, 
+                readable      = TRUE))
+  }
+```
+
+################
+# STOPPED HERE
+################
+
+
+```{r glia_PCA_tSNE}
+glia.pca<-prcomp(t(log10(exprs(dat.glia) + 1)),scale=T,center=T)
+percentVar <- (glia.pca$sdev)^2 / sum((glia.pca$sdev)^2)
+cumVar <- cumsum((glia.pca$sdev)^2) / sum((glia.pca$sdev)^2)
+plot(cumVar*100,main="Cumulative Variance Explained - Overdispersed Genes",xlab="PCA Index",ylab="Cumulative % Variance")
+
+ggbiplot(glia.pca,var.axes=F,groups=pData(dat.glia[glia_expressed_genes,])$batch,ellipse=T) + 
+  scale_color_brewer(palette="Set1") + 
+  ggtitle("Batch") + 
+  theme(aspect.ratio=1)
+
+dat.glia<-reduceDimension(dat.glia,residualModelFormulaStr="~num_genes_expressed",reduction_method="tSNE",norm_method="log",num_dim=3,perplexity=65,verbose=T)
+
+plot_cell_clusters(dat.glia,color="batch")
+plot_cell_clusters(dat.glia,color="genotype") + scale_color_brewer(palette="Set1")
+plot_cell_clusters(dat.glia, markers = c("Top2a", "Tubb3", "Ccnd1", "Ccnd2", "Ccnb1", "Cks1b", "Mad2l1"))
+plot_cell_clusters(dat.glia, markers = c("Sox10","Fabp7"))
+
+# Glia tSNE represents cell cycle
+# Top2a, Tubb3, Ccnd1, Ccnd2, Ccnb1, Cks1b, Mad2l1
+
+dat.glia <- clusterCells(dat.glia,1,2,skip_rho_sigma = F)
+# 6 clusters
+
+plot_cell_clusters(dat.glia,color="Cluster") + scale_color_brewer(palette="Set1")
+```
+
+```{r glia_DDRTree}
+dat.glia <- reduceDimension(dat.glia,max_components=4,reduction_method="DDRTree",norm_method="vstExprs",residualModelFormulaStr="~batch",maxIter=200,tol=1e-15)
+dat.glia <- orderCells(dat.glia)
+
+plot_complex_cell_trajectory(dat.glia, color_by = "CellType") + scale_color_brewer(palette = "Set1") + guides(color = guide_legend(nrow = 5)) + theme(legend.position = "left")
+plot_complex_cell_trajectory(dat.glia, color_by = "State") 
+plot_complex_cell_trajectory(dat.glia, color_by = "genotype") 
+plot_complex_cell_trajectory(dat.glia, color_by = "Cluster") 
+
+grid.arrange(
+  plot_complex_cell_trajectory(dat.glia, color_by = "CellType") + scale_color_brewer(palette = "Set1") + guides(color = guide_legend(nrow = 5)) + theme(legend.position = "left"), 
+  plot_cell_clusters(dat.glia, color = "CellType") + scale_color_brewer(palette = "Set1") + theme(legend.position = "none", aspect.ratio = 1),
+  plot_complex_cell_trajectory(dat.glia, color_by = "genotype") + scale_color_brewer(palette = "Set1") + guides(color = guide_legend(ncol = 5)) + theme(legend.position = "left"), 
+  plot_cell_clusters(dat.glia, color = "genotype") + scale_color_brewer(palette = "Set1") + theme(legend.position = "none", aspect.ratio = 1), 
+  plot_complex_cell_trajectory(dat.glia, color_by = "State") + guides(color = guide_legend(ncol = 5)) + theme(legend.position = "left"), 
+  plot_cell_clusters(dat.glia, color = "State") + theme(legend.position = "none", aspect.ratio = 1), 
+  plot_complex_cell_trajectory(dat.glia, color_by = "Cluster") + guides(color = guide_legend(ncol = 5)) + theme(legend.position = "left"), 
+  plot_cell_clusters(dat.glia, color = "Cluster") + theme(legend.position = "none", aspect.ratio = 1),
+  ncol = 2
+)
+```
+
+```{r BEAM_on_glia}
+plot_cell_trajectory(dat.glia.tree)
+plot_cell_trajectory(dat.glia.tree,color="Pseudotime")
+
+#Set root state after looking at trajectories
+dat.glia<-orderCells(dat.glia,root_state=11)
+plot_cell_trajectory(dat.glia,color="Pseudotime")
+
+neuron_BEAM <- BEAM(dat.glia[unsup_clustering_genes.glia,], fullModelFormulaStr="~batch+num_genes_expressed+sm.ns(Pseudotime, df = 3)*Branch",reducedModelFormulaStr = "~batch+num_genes_expressed+sm.ns(Pseudotime, df = 3)", cores = detectCores()-1,branch_point = 5)
+neuron_BEAM_sigGenes<-rownames(neuron_BEAM)[neuron_BEAM$qval< 1/length(neuron_expressed_genes)]
+
+plot_genes_branched_heatmap(dat.glia[neuron_BEAM_sigGenes,],branch_point=5,show_rownames=TRUE,branch_labels = c("Acetylcholinergic glia", "Noradrenergic glia"),cluster_rows = F,norm_method = "vstExprs")            
+```
+
+
+```{r glia_DE_wrt_genotype}
+glia_genotype_diff_test<-differentialGeneTest(dat.glia[glia_expressed_genes,], fullModelFormulaStr = "~num_genes_expressed+genotype", reducedModelFormulaStr = "~num_genes_expressed", cores=detectCores()-1)
+
+glia_genotype_diff_test_sorted<-glia_genotype_diff_test[order(glia_genotype_diff_test$qval),]
+
+glia_genotype_diff_test_sigGenes<-rownames(glia_genotype_diff_test_sorted[glia_genotype_diff_test_sorted$qval <= 1e-4,])
+
+heatmap_annotation<-pData(dat.glia)[,c("CellType","genotype","sex","Cluster")]
+
+heatmap_colors<-list(
+"Cell Type" =  c("Progenitor/Glia"="#e41a1c","Ambiguous"="#999999"),
+"Genotype" = c("het" = "#7FC97F", "hom" = "#BEAED4"),
+"Sex" = c("female"="black","male"="#999999"),
+"Cluster" = c("1" = "#E41A1C", "2" = "#377EB8", "3" = "#4DAF4A", "4" = "#984EA3", "5" = "#FF7F00", "6" = "#FFFF33", "1" = "#A65628", "2" = "#F781BF", "3" = "#999999"))
+
+#writeLines(paste0('c("',paste(levels(pData(dat.glia)$Cluster),brewer.pal(9, "Set1"),sep='" = "', collapse='", "'),'")'))
+
+
+colnames(heatmap_annotation)<-c("Cell Type","Genotype","Sex","Cluster")
+heatmap_annotation<-heatmap_annotation %>%
+  select("Genotype","Cluster","Sex","Cell Type")
+
+tmp<-t(scale(t(exprs(dat.glia[glia_genotype_diff_test_sigGenes,])),scale=T,center=T))
+heatmap_data<-log(tmp -min(tmp) + 1)
+#heatmap_data<-tmp -min(tmp)
+myLower<-(0)
+myUpper<-(3)
+heatmap_data[heatmap_data<myLower]<-myLower
+heatmap_data[heatmap_data>myUpper]<-myUpper
+rownames(heatmap_data)<-lookupGeneName(dat.glia,rownames(heatmap_data))
+
+pdf("Heatmap_glia_wrt_genotype.pdf",height=36,width=17)
+pheatmap(mat = heatmap_data,
+         scale="none",
+         show_rownames=TRUE,
+         show_colnames=FALSE,
+         drop_levels=FALSE,
+         color = colorRampPalette(rev(brewer.pal(n = 11, name = "RdYlBu")))(100),
+#         color = colorRampPalette(c("blue","white","red"))(100),
+         breaks=seq(myLower,myUpper,length=100),
+         annotation_col=heatmap_annotation,
+         annotation_colors=heatmap_colors,
+         annotation_names_col=TRUE,
+         annotation_legend=TRUE,
+         border_color = NA
+         )
+dev.off()
+```
+
+```{r glia_DE_wrt_Cluster}
+glia_cluster_diff_test<-differentialGeneTest(dat.glia[glia_expressed_genes,], fullModelFormulaStr = "~batch+Cluster", reducedModelFormulaStr = "~batch", cores=detectCores()-1)
+
+glia_cluster_diff_test_sorted<-glia_cluster_diff_test[order(glia_cluster_diff_test$qval),]
+
+glia_cluster_diff_test_sigGenes<-rownames(glia_cluster_diff_test_sorted[glia_cluster_diff_test_sorted$qval <= 1e-7,])
+
+heatmap_annotation<-pData(dat.glia)[,c("CellType","genotype","sex","Cluster")]
+
+heatmap_colors<-list(
+"Cell Type" =  c("Progenitor/Glia"="#e41a1c","Ambiguous"="#999999"),
+"Genotype" = c("het" = "#7FC97F", "hom" = "#BEAED4"),
+"Sex" = c("female"="black","male"="#999999"),
+"Cluster" = c("1" = "#E41A1C", "2" = "#377EB8", "3" = "#4DAF4A", "4" = "#984EA3"))
+
+colnames(heatmap_annotation)<-c("Cell Type","Genotype","Sex","Cluster")
+heatmap_annotation<-heatmap_annotation %>%
+  select("Cluster","Genotype","Sex","Cell Type")
+
+tmp<-t(scale(t(exprs(dat.glia[glia_cluster_diff_test_sigGenes,])),scale=T,center=T))
+heatmap_data<-log(tmp -min(tmp) + 1)
+#heatmap_data<-tmp -min(tmp)
+myLower<-(0)
+myUpper<-(3)
+heatmap_data[heatmap_data<myLower]<-myLower
+heatmap_data[heatmap_data>myUpper]<-myUpper
+rownames(heatmap_data)<-lookupGeneName(dat.glia,rownames(heatmap_data))
+
+pdf("Heatmap_glia_wrt_cluster.pdf",height=36,width=15)
+pheatmap(mat = heatmap_data,
+         scale="none",
+         show_rownames=TRUE,
+         show_colnames=FALSE,
+         drop_levels=FALSE,
+         color = colorRampPalette(rev(brewer.pal(n = 11, name = "RdYlBu")))(100),
+#         color = colorRampPalette(c("blue","white","red"))(100),
+         breaks=seq(myLower,myUpper,length=100),
+         annotation_col=heatmap_annotation,
+         annotation_colors=heatmap_colors,
+         annotation_names_col=TRUE,
+         annotation_legend=TRUE,
+         border_color = NA
+         )
+dev.off()
+```
+
+```{r}
+#pheatmap on genes differentially expressed between genotypes
+
+celltype_genotype_interaction_diff_test<-differentialGeneTest(dat.filtered[expressed_genes,],fullModelFormulaStr = "~num_genes_expressed+batch+CellType_2*genotype",reducedModelFormulaStr = "~num_genes_expressed+batch+CellType_2",cores=detectCores()-1)
+
+celltype_genotype_interaction_diff_test_sorted<-celltype_genotype_interaction_diff_test[order(celltype_genotype_interaction_diff_test$qval),]
+
+celltype_genotype_interaction_sigGenes<-rownames(celltype_genotype_interaction_diff_test_sorted[celltype_genotype_interaction_diff_test_sorted$qval<0.0001,])
+
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#CC79A7")
+
+heatmap_colors<-list(
+genotype = c("het"="red","hom"="blue"),
+sex = c("female" = "grey","male"="black"),
+CellType_2=c("Progenitor/Glia"="#af8dc3","Neuron"="#7fbf7b")
+)
+
+heatmap_data<-vstExprs(dat.filtered[celltype_genotype_interaction_sigGenes,])
+rownames(heatmap_data)<-lookupGeneName(dat.filtered,rownames(heatmap_data))
+
+pheatmap(heatmap_data,
+         annotation_col =pData(dat.filtered)[,c("CellType_2","genotype","sex")],
+         annotation_colors=heatmap_colors,
+         annotation_names_col=T,
+         #cluster_method=cummeRbund:::JSdist(),
+         show_rownames=T,
+         show_colnames = F,
+         scale="row",
+         breaks=seq(-2.5,5.5,length=100))
+
+celltype_diff_test<-differentialGeneTest(dat.filtered[expressed_genes,],fullModelFormulaStr = "~num_genes_expressed+batch+CellType",reducedModelFormulaStr = "~num_genes_expressed+batch",cores=detectCores()-1)
+
+celltype_diff_test_sorted<-celltype_diff_test[order(celltype_diff_test$qval),]
+
+celltype_diff_test_sigGenes<-rownames(celltype_diff_test_sorted[celltype_diff_test_sorted$qval<0.0001,])
+
+#get fold change of mean expression of differential genes in neuron vs. progenitor/glia
+celltypeFoldChange<-esApply(dat.filtered[celltype_diff_test_sigGenes,pData(dat.filtered)$CellType == "Neuron"], 1,function(x){mean(x)})/esApply(dat.filtered[celltype_diff_test_sigGenes,pData(dat.filtered)$CellType == "Progenitor/Glia"], 1,function(x){mean(x)})
+```
+
+```{r}
+dat.unsup_clustering_genes<-dat.filtered[unsup_clustering_expressed_genes,]
+dat.unsup_clustering_genes<-estimateSizeFactors(dat.unsup_clustering_genes)
+dat.unsup_clustering_genes<-estimateDispersions(dat.unsup_clustering_genes,modelFormulaStr="~batch")
+
+dat.unsup_clustering_genes.tree<-reduceDimension(dat.unsup_clustering_genes,max_components=6,reduction_method="DDRTree",norm_method="vstExprs",residualModelFormulaStr="~num_genes_expressed+batch",maxIter=1200,tol=1e-8)
+dat.filtered.tree<-orderCells(dat.filtered.tree)
+plot_cell_trajectory(dat.filtered.tree,color='CellType')
+plot_cell_trajectory(dat.filtered.tree,color='mclust_cluster')+scale_color_brewer(palette="Set1")
+
+plot_cell_trajectory(dat.filtered,color="Pseudotime")
+```
+
+```{r}
+celltypexgenotype_diff_test<-differentialGeneTest(dat.filtered[expressed_genes,],fullModelFormulaStr = "~num_genes_expressed+batch+CellType_2*genotype",reducedModelFormulaStr = "~num_genes_expressed+batch+CellType_2 + genotype",cores=detectCores()-1)
+
+celltypexgenotype_diff_test_sorted<-celltypexgenotype_diff_test[order(celltypexgenotype_diff_test$qval),]
+
+celltypexgenotype_sigGenes<-rownames(celltypexgenotype_diff_test_sorted[celltypexgenotype_diff_test_sorted$qval<0.0001,])
+
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#CC79A7")
+
+heatmap_colors<-list(
+genotype = c("het"="red","hom"="blue"),
+sex = c("female" = "grey","male"="black"),
+CellType_2=c("Progenitor/Glia"="#af8dc3","Neuron"="#7fbf7b")
+)
+
+heatmap_data<-vstExprs(dat.filtered[celltypexgenotype_sigGenes,])
+rownames(heatmap_data)<-lookupGeneName(dat.filtered,rownames(heatmap_data))
+
+pheatmap(heatmap_data,
+         annotation_col =pData(dat.filtered)[,c("CellType_2","genotype","sex")],
+         annotation_colors=heatmap_colors,
+         annotation_names_col=T,
+         #cluster_method=cummeRbund:::JSdist(),
+         show_rownames=T,
+         show_colnames = F,
+         scale="row",
+         breaks=seq(-2.5,5.5,length=100),
+         cutree_cols=7,
+         cutree_rows=4)
+```
+
+
+########
+# WGCNA
+#######
+
+#re-do with log(expression + 1)
+```{r full_dataset}
+powers =seq(1,10,0.25)
+sft = pickSoftThreshold(t(log10(exprs(dat.filtered[expressed_genes,])+1)), powerVector = powers, verbose = 5) #signed
+plot(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2],
+     xlab="Soft Threshold (power)",ylab="Scale Free Topology Model Fit,signed R^2",main = paste("Scale independence"),type="n")
+text(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2],
+     labels=powers,col="red")
+abline(h=0.95,col="red")
+
+plot(sft$fitIndices[,1], sft$fitIndices[,5],
+     xlab="Soft Threshold (power)",ylab="Mean Connectivity", type="n",
+     main = paste("Mean connectivity"))
+text(sft$fitIndices[,1], sft$fitIndices[,5], labels=powers,col="red")
+
+softPower = 3.5
+adjacency = adjacency(t(exprs(dat.filtered[expressed_genes,])), power = softPower) #signed
+TOM = TOMsimilarity(adjacency) #signed
+dissTOM = 1-TOM
+geneTree = hclust(as.dist(dissTOM), method = "average")
+plot(geneTree, xlab="", sub="", main = "Gene clustering on TOM-based dissimilarity",
+     labels = FALSE, hang = 0.04)
+
+#tried 10, 20, 30, 40, 50, 60, 70, 100, 150, 200
+minModuleSize = 5
+dynamicMods = cutreeDynamic(dendro = geneTree, distM = dissTOM,
+  deepSplit = 2, pamRespectsDendro = FALSE,
+  minClusterSize = minModuleSize)
+table(dynamicMods)
+dynamicColors = labels2colors(dynamicMods)
+table(dynamicColors)
+
+plotDendroAndColors(geneTree, dynamicColors, "Dynamic Tree Cut",
+  dendroLabels = FALSE, hang = 0.03,
+  addGuide = TRUE, guideHang = 0.05,
+  main = "Gene dendrogram and module colors")
+
+MEList = moduleEigengenes(t(log10(exprs(dat.filtered[expressed_genes,]) +1)), colors = dynamicColors)
+MEs = MEList$eigengenes
+MEDiss = 1-cor(MEs)
+METree = hclust(as.dist(MEDiss), method = "average")
+plot(METree, main = "Clustering of module eigengenes",
+xlab = "", sub = "")
+MEDissThres = 0.25
+abline(h=MEDissThres, col = "red")
+
+# minModulesize = 40
+#black - 267
+#blue - 2356
+#brown - 426
+#green - 293
+#grey - 1970
+#midnightblue - 74
+#red - 292
+#turquoise - 7455
+
+# minModulesize = 50
+#black - 275
+#blue - 2437
+#brown - 448
+#green - 295
+#grey - 2045
+#turquoise - 7544
+
+# minModulesize = 60
+#black - 275
+#blue - 2465
+#brown - 449
+#green - 297
+#grey - 2162
+#red - 294 
+#turquoise - 7632
+
+# minModulesize = 70
+#blue - 2626
+#brown - 490
+#grey - 2400
+#red - 326
+#turquoise - 7285
+#yellow - 476
+
+# minModulsize = 100
+#blue
+#brown
+#yellow
+#turquoise
+
+pdf("Gene_modules_minmodule5.pdf",height=10,width=10)
+for(i in unique(sort(dynamicColors))){
+  print(plot_cell_clusters(dat.filtered,color=paste0('MEs$ME',i)) + 
+  scale_color_gradient(low="blue", high="red") + 
+  ggtitle(i))
+}
+dev.off()
+
+interesting_modules <- c("black","blue", "brown","chartreuse4","darkmagenta","goldenrod3","green","grey","grey60","khaki4","lightskyblue4","lightyellow4","linen","magenta","mediumorchid3","mediumpurple1","mistyrose2","mistyrose3","oldlace","olivedrab4","orangered3","orangered4","peru","pink","pink2","salmon1","salmon4","sienna2","slateblue3","slateblue4","steelblue","thistle","thistle2","turquoise","yellow") 
+  
+#merge = mergeCloseModules(t(log10(exprs(dat.filtered[expressed_genes,])+1)), dynamicColors, cutHeight = MEDissThres, verbose = 3)
+#mergedColors = merge$colors
+#mergedMEs = merge$oldMEs
+#plotDendroAndColors(geneTree, cbind(dynamicColors, mergedColors),
+#  c("Dynamic Tree Cut", "Merged dynamic"),
+#  dendroLabels = FALSE, hang = 0.03,
+#  addGuide = TRUE, guideHang = 0.05)
+
+#moduleColors = mergedColors
+moduleColors = dynamicColors
+colorOrder = c("grey", standardColors(50))
+moduleLabels = match(moduleColors, colorOrder)-1
+MEs = mergedMEs
+nGenes = nrow(exprs(dat.filtered[expressed_genes,]))
+nSamples = ncol(exprs(dat.filtered[expressed_genes,]))
+MEs0 = moduleEigengenes(t(log10(exprs(dat.filtered[expressed_genes,])+1)), moduleColors)$eigengenes
+MEs = orderMEs(MEs0)
+
+
+pData(dat.filtered[expressed_genes,])$genotype<-(as.numeric(as.factor(pData(dat.filtered[expressed_genes,])$genotype)))
+pData(dat.filtered[expressed_genes,])$sex<-(as.numeric(as.factor(pData(dat.filtered[expressed_genes,])$sex)))
+pData(dat.filtered[expressed_genes,])$sort_date<-(as.numeric(as.factor(pData(dat.filtered[expressed_genes,])$sort_date)))
+pData(dat.filtered[expressed_genes,])$RT_date<-(as.numeric(as.factor(pData(dat.filtered[expressed_genes,])$RT_date)))
+pData(dat.filtered[expressed_genes,])$split_plate<-(as.numeric(as.factor(pData(dat.filtered[expressed_genes,])$split_plate)))
+pData(dat.filtered[expressed_genes,])$source_plate<-(as.numeric(as.factor(pData(dat.filtered[expressed_genes,])$source_plate)))
+pData(dat.filtered[expressed_genes,])$index_1<-(as.numeric(as.factor(pData(dat.filtered[expressed_genes,])$index_1)))
+pData(dat.filtered[expressed_genes,])$index_2<-(as.numeric(as.factor(pData(dat.filtered[expressed_genes,])$index_2)))
+
+#copy pData to new data frame so you can manipulate
+#break down by sex and genotype
+
+moduleTraitCor = cor(MEs, pData(dat.filtered[expressed_genes,]), use = "p")
+moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nSamples)
+
+
+textMatrix = paste(signif(moduleTraitCor, 2), "\n(", signif(moduleTraitPvalue, 1), ")", sep = "")
+dim(textMatrix) = dim(moduleTraitCor)
+
+
+
+labeledHeatmap(Matrix = moduleTraitCor,
+  xLabels = names(pData(dat.filtered[expressed_genes,])),
+  yLabels = names(MEs),
+  ySymbols = names(MEs),
+  colorLabels = FALSE,
+  colors = blueWhiteRed(50),
+  zlim=c(-1,1),
+  textMatrix = textMatrix,
+  setStdMargins = FALSE,
+  cex.text = 0.5,
+  main = paste("Module-trait relationships"))
+
+modNames = substring(names(MEs), 3)
+geneModuleMembership = as.data.frame(cor(t(log10(exprs(dat.filtered[expressed_genes,])+1)), MEs, use = "p"))
+MMPvalue = as.data.frame(corPvalueStudent(as.matrix(geneModuleMembership), nSamples))
+names(geneModuleMembership) = paste("MM", modNames, sep="")
+names(MMPvalue) = paste("p.MM", modNames, sep="")
+
+moduleGeneSets<-lapply(modNames,function(module){
+column = match(module, modNames)
+moduleGenes = moduleColors==module
+rownames(geneModuleMembership[moduleGenes,])
+})
+names(moduleGeneSets)<-modNames
+moduleGeneNames<-lapply(moduleGeneSets,function(x){lookupGeneName(dat.filtered[expressed_genes,],x)})
+
+moduleGeneId<-lapply(moduleGeneSets, function(x){gsub("\\..*","",x)})
+
+
+geneTraitSignificance = as.data.frame(cor(t(exprs(dat.filtered[expressed_genes,])), weight, use = "p"))
+```
+
+
+```{r Hox_gene_expr}
+plot_genes_violin(dat.filtered[fData(dat.filtered)$gene_short_name %in% c("Hoxa1", "Hoxd1", "Hoxa2", "Hoxb2", "Hoxa3", "Hoxb3", "Hoxd3", "Hoxa4", "Hoxb4", "Hoxc4", "Hoxd4", "Hoxa5", "Hoxb5", "Hoxc5", "Hoxa6", "Hoxb6", "Hoxc6", "Hoxa7", "Hoxb7", "Hoxb8", "Hoxc8", "Hoxd8", "Hoxa9", "Hoxb9", "Hoxc9", "Hoxd9", "Hoxa10", "Hoxc10", "Hoxd10"),], grouping = "Cluster", relative_expr = F, color_by = "Cluster", nrow = 5, ncol = 6, panel_order = c("Hoxa1", "Hoxd1", "Hoxa2", "Hoxb2", "Hoxa3", "Hoxb3", "Hoxd3", "Hoxa4", "Hoxb4", "Hoxc4", "Hoxd4", "Hoxa5", "Hoxb5", "Hoxc5", "Hoxa6", "Hoxb6", "Hoxc6", "Hoxa7", "Hoxb7", "Hoxb8", "Hoxc8", "Hoxd8", "Hoxa9", "Hoxb9", "Hoxc9", "Hoxd9", "Hoxa10", "Hoxc10", "Hoxd10"))
+
+tmp_expr <- exprs(dat.filtered)[fData(dat.filtered)$gene_short_name %in% c("Hoxa1", "Hoxd1", "Hoxa2", "Hoxb2", "Hoxa3", "Hoxb3", "Hoxd3", "Hoxa4", "Hoxb4", "Hoxc4", "Hoxd4", "Hoxa5", "Hoxb5", "Hoxc5", "Hoxa6", "Hoxb6", "Hoxc6", "Hoxa7", "Hoxb7", "Hoxb8", "Hoxc8", "Hoxd8", "Hoxa9", "Hoxb9", "Hoxc9", "Hoxd9", "Hoxa10", "Hoxc10", "Hoxd10"),]
+
+tmp_expr <- log10(tmp_expr*10000/pData(dat.filtered)$total_mRNAs + 1)
+
+melted_df <- melt(tmp_expr)
+colnames(melted_df) <- c("gene_id","cell_id","value")
+melted_df <- merge(melted_df, pData(dat.filtered)[,c("State","Cluster","genotype","CellType","sex","age")], by.x = "cell_id", by.y = 0)
+
+#######
+# CLUSTER
+######
+
+mean_expr_cluster <- melted_df %>%
+  group_by(Cluster, gene_id) %>%
+  summarise(mean_expression = mean(value), sd_expression = sd(value)) %>%
+  as.data.frame()
+
+for(i in 1:11){
+  mean_expr_cluster[mean_expr_cluster$Cluster == i, "sem_expression"] <- mean_expr_cluster[mean_expr_cluster$Cluster == i, "sd_expression"]/sqrt(table(pData(dat.filtered)$Cluster)[i])
+}
+
+mean_expr_cluster$gene_short_name <- lookupGeneName(dat.filtered, as.character(mean_expr_cluster$gene_id))
+
+levels(mean_expr_cluster$Cluster)
+mean_expr_cluster$Cluster <- factor(mean_expr_cluster$Cluster,levels(mean_expr_cluster$Cluster)[c(5, 7, 8, 4, 3, 11, 1, 9, 10, 2, 6)])
+
+#ggplot(mean_expr_cluster, aes(x = Cluster, y = mean_expression, fill = Cluster)) +
+#  geom_col() + 
+#    facet_wrap(~gene_short_name, scales = "free") +
+#  geom_errorbar(aes(ymin=mean_expression-sem_expression, ymax=mean_expression+sem_expression))
+
+gene_list <- c("Hoxa1", "Hoxd1", "Hoxa2", "Hoxb2", "Hoxa3", "Hoxb3", "Hoxd3", "Hoxa4", "Hoxb4", "Hoxc4", "Hoxd4", "Hoxa5", "Hoxb5", "Hoxc5", "Hoxa6", "Hoxb6", "Hoxc6", "Hoxa7", "Hoxb7", "Hoxb8", "Hoxc8", "Hoxd8", "Hoxa9", "Hoxb9", "Hoxc9", "Hoxd9", "Hoxa10", "Hoxc10", "Hoxd10")
+
+for(i in seq_along(gene_list)){
+  #print(gene_list[i])
+  assign(paste0("p", i), 
+         ggplot(mean_expr_cluster[mean_expr_cluster$gene_short_name == gene_list[i],], aes(x = Cluster, y = mean_expression, fill = reorder(Cluster, seq(1:11)))) +
+          geom_col() + 
+          geom_errorbar(aes(ymin=mean_expression-sem_expression, ymax=mean_expression+sem_expression)) +
+          theme(legend.position = "none", plot.title = element_text(hjust= 0.5)) +
+           ggtitle(gene_list[i])
+  )
+}
+
+blank <- grid.rect(gp=gpar(col="white"))
+
+library(cowplot)
+Hox_by_cluster <- plot_grid(p1, blank, blank, p2, 
+             p3, p4, blank, blank,
+             p5, p6, blank, p7,
+             p8, p9, p10, p11,
+             p12, p13, p14, blank,
+             p15, p16, p17, blank,
+             p18, p19, blank, blank,
+             blank, p20, p21, p22,
+             p23, p24, p25, p26, 
+             p27, blank, p28, p29,
+             ncol = 4)
+
+save_plot("Hox_genes_by_cluster.pdf", Hox_by_cluster, base_height = 40, base_width = 20)
+
+#######
+# STATE
+######
+
+mean_expr_state <- melted_df %>%
+  group_by(State, gene_id) %>%
+  summarise(mean_expression = mean(value), sd_expression = sd(value)) %>%
+  as.data.frame()
+
+for(i in 1:17){
+  mean_expr_state[mean_expr_state$State == i, "sem_expression"] <- mean_expr_state[mean_expr_state$State == i, "sd_expression"]/sqrt(table(pData(dat.filtered)$State)[i])
+}
+
+mean_expr_state$gene_short_name <- lookupGeneName(dat.filtered, as.character(mean_expr_state$gene_id))
+
+#ggplot(mean_expr_state, aes(x = State, y = mean_expression, fill = State)) +
+#  geom_col() + 
+#    facet_wrap(~gene_short_name, scales = "free") +
+#  geom_errorbar(aes(ymin=mean_expression-sem_expression, ymax=mean_expression+sem_expression))
+
+for(i in seq_along(gene_list)){
+  #print(gene_list[i])
+  assign(paste0("p", i), 
+         ggplot(mean_expr_state[mean_expr_state$gene_short_name == gene_list[i],], aes(x = State, y = mean_expression, fill = State)) +
+          geom_col() + 
+          geom_errorbar(aes(ymin=mean_expression-sem_expression, ymax=mean_expression+sem_expression)) +
+          theme(legend.position = "none", plot.title = element_text(hjust= 0.5)) +
+           ggtitle(gene_list[i])
+  )
+}
+
+Hox_by_state <- plot_grid(p1, blank, blank, p2, 
+             p3, p4, blank, blank,
+             p5, p6, blank, p7,
+             p8, p9, p10, p11,
+             p12, p13, p14, blank,
+             p15, p16, p17, blank,
+             p18, p19, blank, blank,
+             blank, p20, p21, p22,
+             p23, p24, p25, p26, 
+             p27, blank, p28, p29,
+             ncol = 4)
+
+save_plot("Hox_genes_by_state.pdf", Hox_by_state, base_height = 40, base_width = 20)
+
+#######
+# GENOTYPE
+######
+mean_expr_genotype <- melted_df %>%
+  group_by(genotype, gene_id) %>%
+  summarise(mean_expression = mean(value), sd_expression = sd(value)) %>%
+  as.data.frame()
+
+for(i in c("het", "hom")){
+  mean_expr_genotype[mean_expr_genotype$genotype == i, "sem_expression"] <- mean_expr_genotype[mean_expr_genotype$genotype == i, "sd_expression"]/sqrt(table(pData(dat.filtered)$genotype)[i])
+}
+
+mean_expr_genotype$gene_short_name <- lookupGeneName(dat.filtered, as.character(mean_expr_genotype$gene_id))
+
+for(i in seq_along(gene_list)){
+  #print(gene_list[i])
+  assign(paste0("p", i), 
+         ggplot(mean_expr_genotype[mean_expr_genotype$gene_short_name == gene_list[i],], aes(x = genotype, y = mean_expression, fill = genotype)) +
+          geom_col() + 
+          geom_errorbar(aes(ymin=mean_expression-sem_expression, ymax=mean_expression+sem_expression)) +
+          theme(legend.position = "none", plot.title = element_text(hjust= 0.5)) +
+           ggtitle(gene_list[i]) +
+           scale_fill_brewer(palette = "Set1")
+  )
+}
+
+Hox_by_genotype <- plot_grid(p1, blank, blank, p2, 
+             p3, p4, blank, blank,
+             p5, p6, blank, p7,
+             p8, p9, p10, p11,
+             p12, p13, p14, blank,
+             p15, p16, p17, blank,
+             p18, p19, blank, blank,
+             blank, p20, p21, p22,
+             p23, p24, p25, p26, 
+             p27, blank, p28, p29,
+             ncol = 4)
+
+save_plot("Hox_genes_by_genotype.pdf", Hox_by_genotype, base_height = 40, base_width = 20)
+
+######
+# SEX
+######
+
+mean_expr_sex <- melted_df %>%
+  group_by(sex, gene_id) %>%
+  summarise(mean_expression = mean(value), sd_expression = sd(value)) %>%
+  as.data.frame()
+
+for(i in c("female", "male")){
+  mean_expr_sex[mean_expr_sex$sex == i, "sem_expression"] <- mean_expr_sex[mean_expr_sex$sex == i, "sd_expression"]/sqrt(table(pData(dat.filtered)$sex)[i])
+}
+
+mean_expr_sex$gene_short_name <- lookupGeneName(dat.filtered, as.character(mean_expr_sex$gene_id))
+
+for(i in seq_along(gene_list)){
+  #print(gene_list[i])
+  assign(paste0("p", i), 
+         ggplot(mean_expr_sex[mean_expr_sex$gene_short_name == gene_list[i],], aes(x = sex, y = mean_expression, fill = sex)) +
+          geom_col() + 
+          geom_errorbar(aes(ymin=mean_expression-sem_expression, ymax=mean_expression+sem_expression)) +
+          theme(legend.position = "none", plot.title = element_text(hjust= 0.5)) +
+           ggtitle(gene_list[i]) +
+           scale_fill_brewer(palette = "Set1")
+  )
+}
+
+Hox_by_sex <- plot_grid(p1, blank, blank, p2, 
+             p3, p4, blank, blank,
+             p5, p6, blank, p7,
+             p8, p9, p10, p11,
+             p12, p13, p14, blank,
+             p15, p16, p17, blank,
+             p18, p19, blank, blank,
+             blank, p20, p21, p22,
+             p23, p24, p25, p26, 
+             p27, blank, p28, p29,
+             ncol = 4)
+
+save_plot("Hox_genes_by_sex.pdf", Hox_by_sex, base_height = 40, base_width = 20)
+
+######
+# AGE
+######
+
+mean_expr_age <- melted_df %>%
+  group_by(age, gene_id) %>%
+  summarise(mean_expression = mean(value), sd_expression = sd(value)) %>%
+  as.data.frame()
+
+for(i in c("E12.5", "E14.5")){
+  mean_expr_age[mean_expr_age$age == i, "sem_expression"] <- mean_expr_age[mean_expr_age$age == i, "sd_expression"]/sqrt(table(pData(dat.filtered)$age)[i])
+}
+
+mean_expr_age$gene_short_name <- lookupGeneName(dat.filtered, as.character(mean_expr_age$gene_id))
+
+for(i in seq_along(gene_list)){
+  #print(gene_list[i])
+  assign(paste0("p", i), 
+         ggplot(mean_expr_age[mean_expr_age$gene_short_name == gene_list[i],], aes(x = age, y = mean_expression, fill = age)) +
+          geom_col() + 
+          geom_errorbar(aes(ymin=mean_expression-sem_expression, ymax=mean_expression+sem_expression)) +
+          theme(legend.position = "none", plot.title = element_text(hjust= 0.5)) +
+           ggtitle(gene_list[i]) +
+           scale_fill_brewer(palette = "Set1")
+  )
+}
+
+Hox_by_age <- plot_grid(p1, blank, blank, p2, 
+             p3, p4, blank, blank,
+             p5, p6, blank, p7,
+             p8, p9, p10, p11,
+             p12, p13, p14, blank,
+             p15, p16, p17, blank,
+             p18, p19, blank, blank,
+             blank, p20, p21, p22,
+             p23, p24, p25, p26, 
+             p27, blank, p28, p29,
+             ncol = 4)
+
+save_plot("Hox_genes_by_age.pdf", Hox_by_age, base_height = 40, base_width = 20)
+
+######
+# SEX X GENOTYPE
+######
+
+
+mean_expr_sexXgenotype <- melted_df %>%
+  group_by(sex, genotype, gene_id) %>%
+  summarise(mean_expression = mean(value), sd_expression = sd(value)) %>%
+  as.data.frame()
+
+for(i in c("female", "male")){
+  for(j in c("het","hom"))
+  mean_expr_sexXgenotype[mean_expr_sexXgenotype$sex == i & mean_expr_sexXgenotype$genotype == j, "sem_expression"] <- mean_expr_sexXgenotype[mean_expr_sexXgenotype$sex == i & mean_expr_sexXgenotype$genotype == j, "sd_expression"]/sqrt(table(pData(dat.filtered)$sex, pData(dat.filtered)$genotype)[i,j])
+}
+
+mean_expr_sexXgenotype$gene_short_name <- lookupGeneName(dat.filtered, as.character(mean_expr_sexXgenotype$gene_id))
+
+for(i in seq_along(gene_list)){
+  #print(gene_list[i])
+  assign(paste0("p", i), 
+         ggplot(mean_expr_sexXgenotype[mean_expr_sexXgenotype$gene_short_name == gene_list[i],], aes(x = sex, y = mean_expression, fill = sex)) +
+          geom_col() + 
+          geom_errorbar(aes(ymin=mean_expression-sem_expression, ymax=mean_expression+sem_expression)) +
+           facet_wrap(~genotype) +
+          theme(legend.position = "none", plot.title = element_text(hjust= 0.5)) +
+           ggtitle(gene_list[i]) +
+           scale_fill_brewer(palette = "Set1")
+  )
+}
+
+Hox_by_sexXgenotype <- plot_grid(p1, blank, blank, p2, 
+             p3, p4, blank, blank,
+             p5, p6, blank, p7,
+             p8, p9, p10, p11,
+             p12, p13, p14, blank,
+             p15, p16, p17, blank,
+             p18, p19, blank, blank,
+             blank, p20, p21, p22,
+             p23, p24, p25, p26, 
+             p27, blank, p28, p29,
+             ncol = 4)
+
+save_plot("Hox_genes_by_sexXgenotyep.pdf", Hox_by_sexXgenotype, base_height = 40, base_width = 20)
+
+######
+# SEX X GENOTYPE X AGE
+######
+
+mean_expr_sexXgenotypeXage <- melted_df %>%
+  group_by(sex, genotype, age, gene_id) %>%
+  summarise(mean_expression = mean(value), sd_expression = sd(value)) %>%
+  as.data.frame()
+
+for(i in c("female", "male")){
+  for(j in c("het","hom")){
+    for(k in c("E12.5","E14.5")){
+  mean_expr_sexXgenotypeXage[mean_expr_sexXgenotypeXage$sex == i & mean_expr_sexXgenotypeXage$genotype == j & mean_expr_sexXgenotypeXage$age == k, "sem_expression"] <- mean_expr_sexXgenotypeXage[mean_expr_sexXgenotypeXage$sex == i & mean_expr_sexXgenotypeXage$genotype == j & mean_expr_sexXgenotypeXage$age == k, "sd_expression"]/sqrt(table(pData(dat.filtered)$sex, pData(dat.filtered)$genotype, pData(dat.filtered)$age)[i,j,k])
+    }
+  }
+}
+
+mean_expr_sexXgenotypeXage$gene_short_name <- lookupGeneName(dat.filtered, as.character(mean_expr_sexXgenotypeXage$gene_id))
+
+for(i in seq_along(gene_list)){
+  #print(gene_list[i])
+  assign(paste0("p", i), 
+         ggplot(mean_expr_sexXgenotypeXage[mean_expr_sexXgenotypeXage$gene_short_name == gene_list[i],], aes(x = genotype, y = mean_expression, fill = genotype)) +
+          geom_col() + 
+          geom_errorbar(aes(ymin=mean_expression-sem_expression, ymax=mean_expression+sem_expression)) +
+           facet_wrap(~age+sex) +
+          theme(legend.position = "none", plot.title = element_text(hjust= 0.5)) +
+           ggtitle(gene_list[i]) +
+           scale_fill_brewer(palette = "Set1")
+  )
+}
+
+Hox_by_sexXgenotypeXage <- plot_grid(p1, blank, blank, p2, 
+             p3, p4, blank, blank,
+             p5, p6, blank, p7,
+             p8, p9, p10, p11,
+             p12, p13, p14, blank,
+             p15, p16, p17, blank,
+             p18, p19, blank, blank,
+             blank, p20, p21, p22,
+             p23, p24, p25, p26, 
+             p27, blank, p28, p29,
+             ncol = 4)
+
+save_plot("Hox_genes_by_sexXgenotypeXage.pdf", Hox_by_sexXgenotypeXage, base_height = 60, base_width = 20)
+```
+
+```{r save_cogaps_cds}
+saveRDS(object = dat.filtered[expressed_genes,], file = "dat_expressed_genes_CDS.RDS")
+saveRDS(object = dat.neurons[neuron_expressed_genes,], file = "neuron_expressed_genes_CDS.RDS")
+saveRDS(object = dat.glia[glia_expressed_genes,], file = "glia_expressed_genes_CDS.RDS")
+```
+
+# Session Information
+```{r session}
+sessionInfo()
+```

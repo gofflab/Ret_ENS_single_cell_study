@@ -1,0 +1,401 @@
+---
+title: "HSCR tSNE"
+author: "Liz Vincent"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: pdf_document
+---
+```{r init,include=F}
+knitr::opts_chunk$set(message=FALSE,warning=FALSE,error=FALSE)
+#setwd("/Users/liz/Documents/Goff Lab/Chakravarti/Chakravarti_HD")
+
+source('init.R')
+
+dat.filtered <- readRDS("datfiltered_postQC.rds")
+expressed_genes <- readRDS("expressed_genes.rds")
+```
+
+## Determine Overdispersed Genes and Run PCA on Overdispersed Genes
+Subset the uncorrected Cell Data Set by batch to determine overdispersed genes within each batch and take the insection of genes overdispersed in both batches.
+```{r subset_by_batch,include=F}
+dat.batch1<-dat.filtered[,pData(dat.filtered)$batch == "HD01"]
+dat.batch1<-estimateSizeFactors(dat.batch1)
+dat.batch1<-estimateDispersions(dat.batch1,cores=detectCores()-1)
+disp_table.batch1 <- dispersionTable(dat.batch1)
+disp_table.batch1$gene_id<-as.character(disp_table.batch1$gene_id)
+unsup_clustering_genes.batch1 <- disp_table.batch1[disp_table.batch1$dispersion_empirical >= 1.5*(disp_table.batch1$dispersion_fit),'gene_id']
+dat.batch1 <- setOrderingFilter(dat.batch1, unsup_clustering_genes.batch1)
+p.1<-plot_ordering_genes(dat.batch1) + ggtitle("Genes Overdispersed in Batch 1")
+
+dat.batch2<-dat.filtered[,pData(dat.filtered)$batch == "HD02"]
+dat.batch2<-estimateSizeFactors(dat.batch2)
+dat.batch2<-estimateDispersions(dat.batch2,cores=detectCores()-1)
+disp_table.batch2 <- dispersionTable(dat.batch2)
+disp_table.batch2$gene_id<-as.character(disp_table.batch2$gene_id)
+unsup_clustering_genes.batch2 <- disp_table.batch2[disp_table.batch2$dispersion_empirical >= 1.5*(disp_table.batch2$dispersion_fit),'gene_id']
+dat.batch2 <- setOrderingFilter(dat.batch2, unsup_clustering_genes.batch2)
+p.2<-plot_ordering_genes(dat.batch2) + ggtitle("Genes Overdispersed in Batch 2")
+
+dat.batch3<-dat.filtered[,pData(dat.filtered)$batch == "HD03_pool_1"]
+dat.batch3<-estimateSizeFactors(dat.batch3)
+dat.batch3<-estimateDispersions(dat.batch3,cores=detectCores()-1)
+disp_table.batch3 <- dispersionTable(dat.batch3)
+disp_table.batch3$gene_id<-as.character(disp_table.batch3$gene_id)
+unsup_clustering_genes.batch3 <- disp_table.batch3[disp_table.batch3$dispersion_empirical >= 1.5*(disp_table.batch3$dispersion_fit),'gene_id']
+dat.batch3 <- setOrderingFilter(dat.batch3, unsup_clustering_genes.batch3)
+p.3<-plot_ordering_genes(dat.batch3) + ggtitle("Genes Overdispersed in Batch 3")
+
+dat.batch4<-dat.filtered[,pData(dat.filtered)$batch == "HD03_pool_2"]
+dat.batch4<-estimateSizeFactors(dat.batch4)
+dat.batch4<-estimateDispersions(dat.batch4,cores=detectCores()-1)
+disp_table.batch4 <- dispersionTable(dat.batch4)
+disp_table.batch4$gene_id<-as.character(disp_table.batch4$gene_id)
+unsup_clustering_genes.batch4 <- disp_table.batch4[disp_table.batch4$dispersion_empirical >= 1.5*(disp_table.batch4$dispersion_fit),'gene_id']
+dat.batch4 <- setOrderingFilter(dat.batch4, unsup_clustering_genes.batch4)
+p.4<-plot_ordering_genes(dat.batch4) + ggtitle("Genes Overdispersed in Batch 4")
+
+dat.batch5<-dat.filtered[,pData(dat.filtered)$batch == "HD03_pool_3"]
+dat.batch5<-estimateSizeFactors(dat.batch5)
+dat.batch5<-estimateDispersions(dat.batch5,cores=detectCores()-1)
+disp_table.batch5 <- dispersionTable(dat.batch5)
+disp_table.batch5$gene_id<-as.character(disp_table.batch5$gene_id)
+unsup_clustering_genes.batch5 <- disp_table.batch5[disp_table.batch5$dispersion_empirical >= 1.5*(disp_table.batch5$dispersion_fit),'gene_id']
+dat.batch5 <- setOrderingFilter(dat.batch5, unsup_clustering_genes.batch5)
+p.5<-plot_ordering_genes(dat.batch5) + ggtitle("Genes Overdispersed in Batch 5")
+
+grid.arrange(p.1,p.2,p.3,p.4,p.5,nrow=2)
+
+#calculate overall dispersions
+dat.filtered<-estimateSizeFactors(dat.filtered)
+dat.filtered<-estimateDispersions(dat.filtered,cores=detectCores()-1)
+disp_table <- dispersionTable(dat.filtered)
+disp_table$gene_id <- as.character(disp_table$gene_id)
+
+#limit to genes overdispersed in both batches and in the expressed gene set calculated earlier
+tmp1 <- intersect(unsup_clustering_genes.batch1, unsup_clustering_genes.batch2)
+tmp2 <- intersect(tmp1, unsup_clustering_genes.batch3)
+tmp3 <- intersect(tmp2, unsup_clustering_genes.batch4)
+unsup_clustering_genes_intersect <- intersect(tmp3, unsup_clustering_genes.batch5)
+#241
+
+unsup_clustering_expressed_genes<-intersect(unsup_clustering_genes_intersect, expressed_genes)
+# 241 genes
+
+dat.filtered <- setOrderingFilter(dat.filtered, unsup_clustering_genes_intersect)
+p.intersect<-plot_ordering_genes(dat.filtered) + ggtitle("Genes Overdispersed in Both Batches")
+dat.filtered <- setOrderingFilter(dat.filtered, unsup_clustering_expressed_genes)
+p.expressed<-plot_ordering_genes(dat.filtered) + ggtitle("Genes Overdispersed in Both Batches\nExpressed Genes")
+
+grid.arrange(p.1,p.2,p.3,p.4,p.5,p.intersect,p.expressed,ncol=3)
+```
+
+```{r pca_overdispersion}
+dat.filtered.pca<-
+  prcomp(t(log10(exprs(dat.filtered)[unsup_clustering_expressed_genes,] + 1)),
+         scale=T,
+         center=T)
+```
+
+```{r pca_overdisperdsion_plots,echo=F,fig.width=12, fig.height=10}
+screeplot(dat.filtered.pca, npcs = 20, type = "lines", main = "PCA on high-variance expressed genes")
+
+ggbiplot(dat.filtered.pca,var.axes=F,groups=pData(dat.filtered)$batch,ellipse=T) + 
+  scale_color_brewer("Batch", palette="Set1") + 
+  theme(aspect.ratio=1) +
+  ggtitle("PCA on high-variance expressed genes")
+```
+
+# Umap
+```{r Umap}
+#Try umap on pattern weights
+embedding <- umap(t(log10(exprs(dat.filtered[expressed_genes,]) + 1)),n_neighbors = 15L)
+
+pData(dat.filtered)$UMAP1 <- embedding$UMAP1
+pData(dat.filtered)$UMAP2 <- embedding$UMAP2
+
+ggplot(pData(dat.filtered), aes(x = UMAP1, y = UMAP2, color = batch)) +
+  geom_point(size = 1) +
+  scale_color_brewer("Batch", palette = "Set1") +
+  theme_classic() +
+  ggtitle("Umap on 14,319 expressed genes")
+
+embedding <- umap(t(log10(exprs(dat.filtered[unsup_clustering_expressed_genes,]) + 1)), n_neighbors = 20L, random_state = 100L)
+
+pData(dat.filtered)$UMAP1 <- embedding$UMAP1
+pData(dat.filtered)$UMAP2 <- embedding$UMAP2
+
+ggplot(pData(dat.filtered), aes(x = UMAP1, y = UMAP2, color = batch)) +
+  geom_point(size = 1) +
+  scale_color_brewer(palette = "Set1") +
+  theme_classic() +
+  ggtitle("Umap on 292 high-variance expressed genes")
+```
+
+# Normalization by sequencing depth
+```{r normalize_by_read_depth}
+# sum across expressed genes for each cell and divide all gene values by sum to normalize by read depth
+dat.filtered.expressed <- dat.filtered[expressed_genes,]
+dat.filtered.expressed.normalized <- dat.filtered.expressed
+exprs(dat.filtered.expressed.normalized) <- apply(exprs(dat.filtered.expressed), 2, function(x){x/sum(x)})*1e+5
+#exprs(dat.filtered.expressed.normalized) <- apply(exprs(dat.filtered.expressed), 2, function(x){x/sum(x)})
+
+fData(dat.filtered.expressed.normalized)$sd_expr<-esApply(dat.filtered.expressed.normalized,1,function(x){sd(x)})
+#fData(dat.filtered.expressed.normalized)$mean_expr<-esApply(dat.filtered.expressed.normalized,1,function(x){mean(x)})
+```
+
+```{r PCA_on_normalized_data}
+normalized.pca <- prcomp(t(log10(exprs(dat.filtered.expressed.normalized[fData(dat.filtered.expressed.normalized)$sd_expr > .Machine$double.eps,]) + 1)), center =T, scale = T)
+
+ggbiplot(normalized.pca,var.axes=F,groups=pData(dat.filtered.expressed.normalized)$batch,alpha=0, ellipse = T) + 
+  theme(aspect.ratio = 1,plot.title = element_text(size=12), axis.title = element_text(size=8), legend.title = element_text(size=8), legend.text=element_text(size=7)) + 
+  scale_color_brewer("Batch",palette="Set1") +  
+  geom_point(aes(color=pData(dat.filtered.expressed.normalized)$batch), size = 0.6)
+```
+
+```{r subset_by_batch_normalized,include=F}
+dat.batch1<-dat.filtered.expressed.normalized[,pData(dat.filtered.expressed.normalized)$batch == "HD01"]
+dat.batch1<-estimateSizeFactors(dat.batch1)
+dat.batch1<-estimateDispersions(dat.batch1,cores=detectCores()-1)
+disp_table.batch1 <- dispersionTable(dat.batch1)
+disp_table.batch1$gene_id<-as.character(disp_table.batch1$gene_id)
+unsup_clustering_genes.batch1 <- disp_table.batch1[disp_table.batch1$dispersion_empirical >= 1.4*(disp_table.batch1$dispersion_fit),'gene_id']
+dat.batch1 <- setOrderingFilter(dat.batch1, unsup_clustering_genes.batch1)
+p.1<-plot_ordering_genes(dat.batch1) + ggtitle("Genes Overdispersed in Batch 1")
+
+dat.batch2<-dat.filtered.expressed.normalized[,pData(dat.filtered.expressed.normalized)$batch == "HD02"]
+dat.batch2<-estimateSizeFactors(dat.batch2)
+dat.batch2<-estimateDispersions(dat.batch2,cores=detectCores()-1)
+disp_table.batch2 <- dispersionTable(dat.batch2)
+disp_table.batch2$gene_id<-as.character(disp_table.batch2$gene_id)
+unsup_clustering_genes.batch2 <- disp_table.batch2[disp_table.batch2$dispersion_empirical >= 1.4*(disp_table.batch2$dispersion_fit),'gene_id']
+dat.batch2 <- setOrderingFilter(dat.batch2, unsup_clustering_genes.batch2)
+p.2<-plot_ordering_genes(dat.batch2) + ggtitle("Genes Overdispersed in Batch 2")
+
+dat.batch3<-dat.filtered.expressed.normalized[,pData(dat.filtered.expressed.normalized)$batch == "HD03_pool_1"]
+dat.batch3<-estimateSizeFactors(dat.batch3)
+dat.batch3<-estimateDispersions(dat.batch3,cores=detectCores()-1)
+disp_table.batch3 <- dispersionTable(dat.batch3)
+disp_table.batch3$gene_id<-as.character(disp_table.batch3$gene_id)
+unsup_clustering_genes.batch3 <- disp_table.batch3[disp_table.batch3$dispersion_empirical >= 1.4*(disp_table.batch3$dispersion_fit),'gene_id']
+dat.batch3 <- setOrderingFilter(dat.batch3, unsup_clustering_genes.batch3)
+p.3<-plot_ordering_genes(dat.batch3) + ggtitle("Genes Overdispersed in Batch 3")
+
+dat.batch4<-dat.filtered.expressed.normalized[,pData(dat.filtered.expressed.normalized)$batch == "HD03_pool_2"]
+dat.batch4<-estimateSizeFactors(dat.batch4)
+dat.batch4<-estimateDispersions(dat.batch4,cores=detectCores()-1)
+disp_table.batch4 <- dispersionTable(dat.batch4)
+disp_table.batch4$gene_id<-as.character(disp_table.batch4$gene_id)
+unsup_clustering_genes.batch4 <- disp_table.batch4[disp_table.batch4$dispersion_empirical >= 1.4*(disp_table.batch4$dispersion_fit),'gene_id']
+dat.batch4 <- setOrderingFilter(dat.batch4, unsup_clustering_genes.batch4)
+p.4<-plot_ordering_genes(dat.batch4) + ggtitle("Genes Overdispersed in Batch 4")
+
+dat.batch5<-dat.filtered.expressed.normalized[,pData(dat.filtered.expressed.normalized)$batch == "HD03_pool_3"]
+dat.batch5<-estimateSizeFactors(dat.batch5)
+dat.batch5<-estimateDispersions(dat.batch5,cores=detectCores()-1)
+disp_table.batch5 <- dispersionTable(dat.batch5)
+disp_table.batch5$gene_id<-as.character(disp_table.batch5$gene_id)
+unsup_clustering_genes.batch5 <- disp_table.batch5[disp_table.batch5$dispersion_empirical >= 1.4*(disp_table.batch5$dispersion_fit),'gene_id']
+dat.batch5 <- setOrderingFilter(dat.batch5, unsup_clustering_genes.batch5)
+p.5<-plot_ordering_genes(dat.batch5) + ggtitle("Genes Overdispersed in Batch 5")
+
+#grid.arrange(p.1,p.2,p.3,p.4,p.5,nrow=2)
+
+#calculate overall dispersions
+dat.filtered.expressed.normalized<-estimateSizeFactors(dat.filtered.expressed.normalized)
+dat.filtered.expressed.normalized<-estimateDispersions(dat.filtered.expressed.normalized,cores=detectCores()-1)
+disp_table <- dispersionTable(dat.filtered.expressed.normalized)
+disp_table$gene_id <- as.character(disp_table$gene_id)
+
+#limit to genes overdispersed in both batches and in the expressed gene set calculated earlier
+tmp1 <- intersect(unsup_clustering_genes.batch1, unsup_clustering_genes.batch2)
+tmp2 <- intersect(tmp1, unsup_clustering_genes.batch3)
+tmp3 <- intersect(tmp2, unsup_clustering_genes.batch4)
+unsup_clustering_expressed_genes <- intersect(tmp3, unsup_clustering_genes.batch5)
+#419
+
+dat.filtered.expressed.normalized <- setOrderingFilter(dat.filtered.expressed.normalized, unsup_clustering_expressed_genes)
+p.expressed<-plot_ordering_genes(dat.filtered.expressed.normalized) + ggtitle("Genes Overdispersed in Both Batches\nExpressed Genes")
+
+#grid.arrange(p.1,p.2,p.3,p.4,p.5,p.expressed,ncol=3)
+
+embedding <- umap(t(log10(exprs(dat.filtered.expressed.normalized[unsup_clustering_expressed_genes,]) + 1)), n_neighbors = 20L, random_state = 100L, min_dist = .001, spread = 15, n_epochs = 5000)
+
+#embedding <- umap(t(log10(exprs(dat.filtered.expressed.normalized[unsup_clustering_expressed_genes,]) + 1)), n_neighbors = 20L, random_state = 100L)
+
+pData(dat.filtered.expressed.normalized)$UMAP1 <- embedding$UMAP1
+pData(dat.filtered.expressed.normalized)$UMAP2 <- embedding$UMAP2
+
+ggplot(pData(dat.filtered.expressed.normalized), aes(x = UMAP1, y = UMAP2, color = genotype)) +
+  geom_point(size = 1) +
+  scale_color_brewer(palette = "Set1") +
+  theme_classic() +
+  ggtitle("Umap on 419 high-variance expressed genes")
+
+pData(dat.filtered)$UMAP1 <- embedding$UMAP1
+pData(dat.filtered)$UMAP2 <- embedding$UMAP2
+
+ggplot(pData(dat.filtered)) + 
+  geom_point(aes(x = UMAP1,y = UMAP2, col = CellType)) +
+  scale_color_brewer("Cell Type", palette = "Set1") +
+  theme(legend.position = c(0.5, 0.15), legend.text = element_text(size = 18), legend.title = element_text(size = 20))
+```
+
+```{r plot_by_condition}
+pData(dat.filtered) %>%
+  mutate(condition = paste(age, genotype, sex)) %>%
+  ggplot(.) + 
+  geom_point(aes(x = UMAP1,y = UMAP2, col = condition)) +
+  scale_color_brewer("Condition", palette = "Paired") +
+  theme(legend.position = c(0.6, 0.2), legend.text = element_text(size = 18), legend.title = element_text(size = 20))
+```
+
+```{r clustering}
+m <- Mclust(data = pData(dat.filtered.expressed.normalized)[c("UMAP1", "UMAP2")], G = 11)
+plot(m)
+pData(dat.filtered.expressed.normalized)$cluster <- as.factor(m$classification)
+
+ggplot(pData(dat.filtered.expressed.normalized), aes(x = UMAP1, y = UMAP2, color = cluster)) +
+  geom_point(size = 1) +
+#  scale_color_brewer(palette = "Set1") +
+  theme_classic()
+
+pData(dat.filtered)$cluster <- as.factor(m$classification)
+```
+
+## Build the Cell Type Hierarchy
+```{r}
+#cth<-addCellType(cth,"Neuroendocrine Cell",classify_func=function(x){ x[lookupGeneId(dat.filtered.expressed.normalized,"Cck"),] > 90 | x[lookupGeneId(dat.filtered.expressed.normalized,"Grp"),] > 90 | x[lookupGeneId(dat.filtered.expressed.normalized,"Dll3"),] > 8 })
+#Ascl1, Cck, Chga, Syp, Grp, Dll3, Rtn1
+
+# Nos1/Vip - inhibitory muscle motor neurons
+
+#Neuropeptide Y neurons:
+#Npy, Npy1r, Npy2r
+
+#Substance P neurons:
+#Tac1
+
+#Serotenergic
+#Slc6a4, Htr1b, Htr2a, Htr2b, Htr3a, Htr4, Htr3b, 
+
+#cth<-addCellType(cth,"Descending Interneurons (myenteric; migrating myoelectric complex)",classify_func=function(x){ x[lookupGeneId(dat.filtered.expressed.normalized,"Cck"),] == 0 | x[lookupGeneId(dat.filtered.expressed.normalized,"Sst"),] > 0 | x[lookupGeneId(dat.filtered.expressed.normalized,"Slc18a3"),] > 0})
+
+cth<-newCellTypeHierarchy() 
+
+cth<-addCellType(cth,"Neuron",classify_func=function(x){ x[lookupGeneId(dat.filtered.expressed.normalized,"Snap25"),] > 50 | x[lookupGeneId(dat.filtered.expressed.normalized,"Nefl"),] > 90 | x[lookupGeneId(dat.filtered.expressed.normalized,"Rtn1"),] > 50 | x[lookupGeneId(dat.filtered.expressed.normalized,"Vip"),] > 60 | x[lookupGeneId(dat.filtered.expressed.normalized,"Tubb3"),] > 160 | x[lookupGeneId(dat.filtered.expressed.normalized,"Nefh"),] > 1 | x[lookupGeneId(dat.filtered.expressed.normalized,"Elavl3"),] > 6 | x[lookupGeneId(dat.filtered.expressed.normalized,"Elavl4"),] > 200 })
+
+cth<-addCellType(cth,"Noradrenergic Neuron",parent_cell_type_name = "Neuron",classify_func=function(x){ x[lookupGeneId(dat.filtered.expressed.normalized,"Isl1"),] > 10 & x[lookupGeneId(dat.filtered.expressed.normalized,"Dbh"),] > 40})
+
+cth<-addCellType(cth,"Acetylcholinergic Neuron",parent_cell_type_name = "Neuron",classify_func=function(x){ (x[lookupGeneId(dat.filtered.expressed.normalized,"Ache"),] > 1 & x[lookupGeneId(dat.filtered.expressed.normalized,"Slc18a3"),] > 0)})
+
+cth<-addCellType(cth,"Progenitor/Glia",classify_func=function(x){ x[lookupGeneId(dat.filtered.expressed.normalized,"Tubb3"),] < 30  | x[lookupGeneId(dat.filtered.expressed.normalized,"Fabp7"),]  > 30 })
+
+dat.filtered.expressed.normalized<-classifyCells(dat.filtered.expressed.normalized,cth)
+
+ggplot(pData(dat.filtered.expressed.normalized), aes(x = UMAP1, y = UMAP2, color = CellType)) +
+  geom_point() +
+  scale_color_manual(values = c("#E41A1C", "#F781BF", "#377EB8", "#4DAF4A", "#984EA3", "#999999")) +
+  theme_classic() +
+  ggtitle("Umap on 419 genes post-normalization\nAnnotation based on normalized expression values only")
+
+pData(dat.filtered.expressed.normalized)[pData(dat.filtered.expressed.normalized)$cluster == 11, "CellType"] <- "Noradrenergic Neuron"
+pData(dat.filtered.expressed.normalized)[pData(dat.filtered.expressed.normalized)$cluster == 4 & pData(dat.filtered.expressed.normalized)$CellType %in% c("Unknown", "Ambiguous"), "CellType"] <- "Neuron"
+
+pData(dat.filtered.expressed.normalized)[pData(dat.filtered.expressed.normalized)$cluster %in% c(1, 5, 6, 10) & pData(dat.filtered.expressed.normalized)$CellType %in% c("Unknown", "Ambiguous"), "CellType"] <- "Progenitor/Glia"
+
+levels(pData(dat.filtered.expressed.normalized)$CellType) <- c(levels(pData(dat.filtered.expressed.normalized)$CellType), "Transition Cell")
+pData(dat.filtered.expressed.normalized)[pData(dat.filtered.expressed.normalized)$CellType%in% c("Unknown", "Ambiguous"), "CellType"] <- "Transition Cell"
+
+ggplot(pData(dat.filtered.expressed.normalized), aes(x = UMAP1, y = UMAP2, color = CellType)) +
+  geom_point() +
+  scale_color_brewer(palette = "Set1") +
+  theme_classic() +
+  ggtitle("Umap on 419 genes post-normalization\nAnnotation post-imputation")
+
+pData(dat.filtered)$CellType <- pData(dat.filtered.expressed.normalized)$CellType
+
+tmp_df <- pData(dat.filtered) %>%
+  mutate(condition = paste(age, genotype, sex)) %>% dplyr::select(condition, CellType) %>% table(.) %>% as.data.frame(.) %>% dcast(formula = condition ~ CellType)
+
+rownames(tmp_df) <- tmp_df[,1]
+
+tmp_df <- tmp_df[,c(-1, -3, -7)]
+
+tmp_df <- as.data.frame(apply(tmp_df, 1, function(x){x/sum(x)}))
+
+tmp_df$condition <- rownames(tmp_df)
+
+tmp_df <- melt(tmp_df)
+
+labels <- tmp_df$variable
+labels <- str_replace_all(labels, " ", "\n")
+
+
+ggplot(tmp_df) + 
+  geom_col(aes(x = variable, y = value, fill = condition), width = 0.7, position = "dodge") +
+  scale_fill_brewer("Cell Type", palette = "Set1") + 
+  scale_y_continuous("Proportion", expand = c(0,0)) + 
+  scale_x_discrete(labels = labels) +
+  theme(legend.position = c(0.66, 0.86), axis.title.x = element_blank())
+```
+
+## DDRTree
+```{r}
+# DDRTree max components akin to # of endpoints you think you might have (e.g. 5 or 6 for this data)
+dat.filtered.expressed.normalized <- reduceDimension(dat.filtered.expressed.normalized, max_components = 10, reduction_method = "DDRTree", norm_method = "log", residualModelFormulaStr = "~batch", maxIter = 2000, tol = 1e-7)
+dat.filtered.expressed.normalized <- orderCells(dat.filtered.expressed.normalized)
+
+ggplot(pData(dat.filtered.expressed.normalized), aes(x = UMAP1, y = UMAP2, color = State)) +
+  geom_point(size = 1) +
+#  scale_color_brewer(palette = "Set1") +
+  theme_classic() +
+  ggtitle("Umap on 419 genes post-normalization")
+
+plot_complex_cell_trajectory(dat.filtered.expressed.normalized, color_by = "State") # + scale_color_brewer(palette = "Set1")
+
+dat.filtered.expressed.normalized <- orderCells(dat.filtered.expressed.normalized, root_state = 5)
+
+plot_complex_cell_trajectory(dat.filtered.expressed.normalized, color_by = "CellType") +
+  scale_color_brewer(palette = "Set1") + 
+  guides(col = guide_legend(nrow = 2))
+```
+
+```{r remove_sacral_pop}
+vagal_dat.filtered.expressed.normalized <- dat.filtered.expressed.normalized[, !(pData(dat.filtered.expressed.normalized)$cluster == 11)]
+
+vagal_dat.filtered <- dat.filtered[,rownames(pData(vagal_dat.filtered.expressed.normalized))]
+```
+
+
+# Population markers:
+
+Mitotic glial progenitors:
+*Ube2c/Kpna2/Top2a/Pbk/Prc1/Tacc3/Aurka/Aurkb/Cdc20/Hist1h2ao/Ccna2/Hmgb2
+
+Other population markers:
+*Gal/Ass1/Cldn5/Gm5424
+*Cck/St18: transcription factor (repressor)
+*Prph: neuonal cytoskeleton protein in PNS/A730017C20Rik/Mapt: encodes tao protein, very important in nervous system/Syn2/Sncg:found primarily in the peripheral nervous system (in primary sensory neurons, sympathetic neurons, and motor neurons)/Ecel1
+*Pcp4: purkinje cell protein, plays role in synaptic plasticity/Ddc
+*Myl9/Cnn2: may function in the structural organization of actin filaments. The encoded protein could play a role in smooth muscle contraction and cell adhesion/Anxa2: functions as an autocrine factor which heightens osteoclast formation and bone resorption/Col3a1: involved in connective tissue/Postn: support adhesion and migration of epithelial cells/Mmp2:major structural component of basement membranes/Gpr17: highly expressed in precursors to mature oligodendrocytes but not expressed in mature oligodendrocytes
+*Hes1
+*Myl1
+
+Neuroendocrine-specific protein
+*I cells secrete Cck
+*G cells release gastrin and stimulate gastric acid secretion (cells do not express Gast but do express Grp, which stimulates release of gastrin)
+*N cells release Nts (maybe...a few cells express Nts)
+*D cells secrete Sst
+* Neuroendocrine genes: Cck, Nts, Sst, Vip, Grp, Rtn1
+*Ascl1 = neuroendocrine TF
+*Chga
+*Syp
+*Calca
+
+```{r,include=F,eval=F}
+saveRDS(dat.filtered,file="datfiltered_postCTH.rds")
+```
+
+# Session Info
+```{r SessionInfo,echo=F}
+sessionInfo()
+```
