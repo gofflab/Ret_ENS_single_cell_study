@@ -7,6 +7,15 @@
 *_table
 run.info
 samples.table
+Figures for committee meeting.R
 *.rds
+*.RDS
 *.txt
+*.pdf
+*.jpeg
+*.png
+*.tiff
+*.pptx
+*.csv
+*.xlsx
 figures/*
