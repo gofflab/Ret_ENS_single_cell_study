@@ -459,6 +459,10 @@ expressed_genes<-rownames(fData(dat.filtered)[fData(dat.filtered)$num_cells_expr
 # Set sd lower limit effectively to 0 - this excludes 3 more genes than setting it exactly to zero, but these genes have sd < 2e-35, which prcomp considers to be constant/zero variance
 #14,319 genes
 
+fData(dat.filtered)$expressed <- FALSE
+fData(dat.filtered)[expressed_genes, "expressed"] <- TRUE
+
+
 ggplot(fData(dat.filtered)) +
   geom_density(aes(x = num_cells_expressed)) +
   geom_vline(xintercept = 20, lty = "dashed", color = "red") +

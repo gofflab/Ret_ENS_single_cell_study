@@ -1,0 +1,166 @@
+---
+title: "Cyclone and RNA Velocity"
+author: "Liz Vincent"
+date: "2/7/2019"
+output: pdf_document
+---
+
+```{r cyclone}
+library(scran)
+mm.pairs <- readRDS(system.file("exdata", "mouse_cycle_markers.rds", package="scran"))
+
+sce <- exprs(dat.filtered)
+rownames(sce) <- gsub("\\..*", "", rownames(exprs(dat.filtered)))
+
+assigned <- scran::cyclone(sce, pairs=mm.pairs)
+
+#head(assigned$scores)
+
+rownames(assigned$scores) <- rownames(pData(dat.filtered))
+pData(dat.filtered) <- cbind(pData(dat.filtered), assigned$scores)
+
+ggplot(tmp) +
+  geom_point(aes(x = UMAP1, y = UMAP2, color = S))
+
+
+p1 <- ggplot(tmp) +
+    geom_point(aes(x = UMAP1, y = UMAP2, color = G1)) +
+    scale_color_viridis(option = "plasma", limits = c(0, 1)) +
+    theme(aspect.ratio = 1, legend.position = "none") +
+    ggtitle("G1")
+p2 <- ggplot(tmp) +
+  geom_point(aes(x = UMAP1, y = UMAP2, color = S)) +
+  scale_color_viridis(option = "plasma", limits = c(0, 1)) +
+    theme(aspect.ratio = 1, legend.position = "none") +
+    ggtitle("S")
+p3 <- ggplot(tmp) +
+  geom_point(aes(x = UMAP1, y = UMAP2, color = G2M)) +
+  scale_color_viridis(option = "plasma", limits = c(0, 1)) +
+    theme(aspect.ratio = 1, legend.title = element_blank(), legend.position = c(0.8, 0.2)) +
+    ggtitle("G2/M")
+
+grid.arrange(p1, p2, p3, ncol = 3)
+
+p1 <- tmp %>%
+  mutate(group=paste(age, genotype)) %>%
+  ggplot(.) +
+  geom_density(aes(x = G1, color = group)) +
+  facet_wrap(~CellType, scales = "free_y") +
+  scale_color_manual(values = cbPalette[1:4]) +
+  theme(legend.position = "none") +
+  ggtitle("G1")
+  
+p2 <- tmp %>%
+  mutate(group=paste(age, genotype)) %>%
+  ggplot(.) +
+  geom_density(aes(x = S, color = group)) +
+  facet_wrap(~CellType, scales = "free_y") +
+  scale_color_manual(values = cbPalette[1:4]) +
+  theme(legend.position = "none") +
+  ggtitle("S")
+
+
+p3 <- tmp %>%
+  mutate(group=paste(age, genotype)) %>%
+  ggplot(.) +
+  geom_density(aes(x = G2M, color = group)) +
+  facet_wrap(~CellType, scales = "free_y") +
+  scale_color_manual(values = cbPalette[1:4]) +
+  theme(legend.position = c(0.8, 0.2)) +
+  ggtitle("G2/M")
+
+grid.arrange(p1, p2, p3, ncol = 3)
+
+p1 <- ggplot(tmp) +
+    geom_density(aes(x = G1, color = genotype)) +
+    facet_wrap(~CellType+age, scales = "free_y") +
+    scale_color_brewer(palette = "Set1") +
+    theme(legend.position = "none") +
+    ggtitle("G1")
+
+p2 <- ggplot(tmp) +
+    geom_density(aes(x = S, color = genotype)) +
+    facet_wrap(~CellType, scales = "free_y") +
+    scale_color_brewer(palette = "Set1") +
+    theme(legend.position = "none") +
+    ggtitle("S")
+
+p3 <- ggplot(tmp) +
+    geom_density(aes(x = G2M, color = genotype)) +
+    facet_wrap(~CellType, scales = "free_y") +
+    scale_color_brewer(palette = "Set1") +
+    theme(legend.position = c(0.8, 0.2)) +
+    ggtitle("G2/M")
+
+grid.arrange(p1, p2, p3, ncol =3)
+```
+
+```{r Louvain_clustering}
+louvain_cluster <- clusterCells(dat.filtered, method = "louvain", k = 10)
+
+klibrary(igraph)
+edges <- as.matrix(pData(dat.filtered)[,c("UMAP1", "UMAP2")])
+edges[,"UMAP1"] <- edges[,"UMAP1"] - min(edges[,"UMAP1"]) + 1
+edges[,"UMAP2"] <- edges[,"UMAP2"] - min(edges[,"UMAP2"]) + 1
+A <- get.adjacency(graph.edgelist(edges, directed=FALSE))
+f#A <- dist(pData(dat.filtered)[,c("UMAP1", "UMAP2")])
+NetworkToolbox::louvain()
+```
+
+
+```{r velocyto}
+ldat <- read.loom.matrices("../Velocyto/merged.loom")
+
+hist(log10(rowSums(ldat$spliced)+1),col='wheat',xlab='log10[ number of reads + 1]',main='number of reads per gene')
+
+ldat <- lapply(ldat,function(x) { # remove :SAMPLE_NAME.bam
+  colnames(x) <-  gsub(":.*$", "", colnames(x))
+  x
+})
+
+ldat <- lapply(ldat, function(x) { # filter to only expressed genes, instead of filtering genes by cluster average
+  x[rownames(x) %in% lookupGeneName(dat.filtered, expressed_genes), ]
+})
+
+cell.colors <- ifelse(pData(dat.filtered)$genotype == "het", "#E41A1C", "#377EB8")
+
+
+names(cell.colors) <- pData(dat.filtered)$cell_id
+emb <- as.matrix(pData(dat.filtered)[,c("UMAP1", "UMAP2")])
+
+
+emat <- ldat$spliced # exonic read (spliced) expression matrix
+nmat <- ldat$unspliced # intronic read (unspliced) expression matrix
+smat <- ldat$spanning # spanning read (intron+exon) expression matrix
+
+fit.quantile <- 0.05
+rvel.qf <- gene.relative.velocity.estimates(emat,nmat,deltaT=1,kCells = 5,fit.quantile = fit.quantile) # perhaps the most robust estimate, that combines cell kNN pooling with the gamma fit based on an extreme quantiles
+pca.velocity.plot(rvel.qf,nPcs=5,plot.cols=2,cell.colors=ac(cell.colors,alpha=0.7),cex=1.2,pcount=0.1,pc.multipliers=c(1,-1,-1,-1,-1)) # visualize the velocities by projecting observed and extrapolated cells onto the first 5 PCs
+
+
+#gene.relative.velocity.estimates(emat,nmat, kCells = 5,fit.quantile = fit.quantile,old.fit=rvel.qf,show.gene='Chga',cell.emb=emb,cell.colors=cell.colors)
+
+rvel <- gene.relative.velocity.estimates(emat,nmat,smat=smat, kCells = 5, fit.quantile=fit.quantile, diagonal.quantiles = TRUE) # use spanning reads (smat) to fit the gene offsets. This will result in more accurate offset estimates, but for much fewer genes (spanning reads are rare)
+pca.velocity.plot(rvel,nPcs=5,plot.cols=2,cell.colors=ac(cell.colors,alpha=0.7),cex=1.2,pcount=0.1,pc.multipliers=c(1,-1,1,1,1))
+
+#####
+
+cell.alpha=0.4
+cell.cex=1
+
+vel <- rvel #spanning reads
+
+show.velocity.on.embedding.cor(as.matrix(emb),vel,n=100,scale='sqrt',cell.colors=ac(cell.colors,alpha=cell.alpha),cex=cell.cex,arrow.scale=30,arrow.lwd=1)
+
+show.velocity.on.embedding.cor(as.matrix(emb),vel,n=100,scale='sqrt',cell.colors=ac(cell.colors,alpha=cell.alpha),cex=cell.cex,arrow.scale=30,show.grid.flow=TRUE,min.grid.cell.mass=0.5,grid.n=20,arrow.lwd=2)
+
+vel <- rvel.qf #Knn pooling
+show.velocity.on.embedding.cor(as.matrix(emb),vel,n=100,scale='sqrt',cell.colors=ac(cell.colors,alpha=cell.alpha),cex=cell.cex,arrow.scale=30,arrow.lwd=1)
+
+show.velocity.on.embedding.cor(as.matrix(emb),vel,n=100,scale='sqrt',cell.colors=ac(cell.colors,alpha=cell.alpha),cex=cell.cex,arrow.scale=30,show.grid.flow=TRUE,min.grid.cell.mass=0.5,grid.n=20,arrow.lwd=2)
+
+x <- show.velocity.on.embedding.eu(as.matrix(emb),rvel,n=40,scale='sqrt',cell.colors=ac(cell.colors,alpha=cell.alpha),cex=cell.cex,nPcs=30,sigma=2.5,show.trajectories=TRUE,diffusion.steps=400,n.trajectory.clusters=15,ntop.trajectories=1,embedding.knn=T,control.for.neighborhood.density=TRUE,n.cores=40) 
+
+
+
+```

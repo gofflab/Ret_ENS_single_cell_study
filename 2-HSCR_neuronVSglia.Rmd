@@ -678,67 +678,74 @@ fData(dat.glia.expressed.normalized)$sd_expr <- esApply(dat.glia.expressed.norma
 ```
 
 ```{r find_overdispersed_genes}
+dat.glia.expressed.normalized <- estimateSizeFactors(dat.glia.expressed.normalized)
+dat.glia.expressed.normalized <- estimateDispersions(dat.glia.expressed.normalized)
+disp_table.glia <- dispersionTable(dat.glia.expressed.normalized)
+disp_table.glia$gene_id <- as.character(disp_table.glia$gene_id)
+
 dat.glia.batch1 <- dat.glia.expressed.normalized[, pData(dat.glia.expressed.normalized)$batch == "HD01"]
 dat.glia.batch1 <- estimateSizeFactors(dat.glia.batch1)
 dat.glia.batch1 <- estimateDispersions(dat.glia.batch1, cores = detectCores() - 1)
 disp_table.glia.batch1 <- dispersionTable(dat.glia.batch1)
 disp_table.glia.batch1$gene_id <- as.character(disp_table.glia.batch1$gene_id)
-unsup_clustering_genes.glia.batch1 <- disp_table.glia.batch1[disp_table.glia.batch1$dispersion_empirical >= 1.4*(disp_table.glia.batch1$dispersion_fit), 'gene_id']
-dat.glia.batch1 <- setOrderingFilter(dat.glia.batch1, unsup_clustering_genes.glia.batch1)
-p.1 <- plot_ordering_genes(dat.glia.batch1) + ggtitle("Genes Overdispersed in Batch 1 - Glia Subset")
 
 dat.glia.batch2 <- dat.glia.expressed.normalized[, pData(dat.glia.expressed.normalized)$batch == "HD02"]
 dat.glia.batch2 <- estimateSizeFactors(dat.glia.batch2)
 dat.glia.batch2 <- estimateDispersions(dat.glia.batch2, cores = detectCores() - 1)
 disp_table.glia.batch2 <- dispersionTable(dat.glia.batch2)
 disp_table.glia.batch2$gene_id <- as.character(disp_table.glia.batch2$gene_id)
-unsup_clustering_genes.glia.batch2 <- disp_table.glia.batch2[disp_table.glia.batch2$dispersion_empirical >= 1.4*(disp_table.glia.batch2$dispersion_fit), 'gene_id']
-dat.glia.batch2 <- setOrderingFilter(dat.glia.batch2, unsup_clustering_genes.glia.batch2)
-p.2 <- plot_ordering_genes(dat.glia.batch2) + ggtitle("Genes Overdispersed in Batch 2 - Glia Subset")
 
 dat.glia.batch3 <- dat.glia.expressed.normalized[, pData(dat.glia.expressed.normalized)$batch == "HD03_pool_1"]
 dat.glia.batch3 <-estimateSizeFactors(dat.glia.batch3)
 dat.glia.batch3 <- estimateDispersions(dat.glia.batch3, cores = detectCores() - 1)
 disp_table.glia.batch3 <- dispersionTable(dat.glia.batch3)
 disp_table.glia.batch3$gene_id <- as.character(disp_table.glia.batch3$gene_id)
-unsup_clustering_genes.glia.batch3 <- disp_table.glia.batch3[disp_table.glia.batch3$dispersion_empirical >= 1.4*(disp_table.glia.batch3$dispersion_fit), 'gene_id']
-dat.glia.batch3 <- setOrderingFilter(dat.glia.batch3, unsup_clustering_genes.glia.batch3)
-p.3 <- plot_ordering_genes(dat.glia.batch3) + ggtitle("Genes Overdispersed in Batch 3 - Glia Subset")
 
 dat.glia.batch4 <- dat.glia.expressed.normalized[, pData(dat.glia.expressed.normalized)$batch == "HD03_pool_2"]
 dat.glia.batch4 <- estimateSizeFactors(dat.glia.batch4)
 dat.glia.batch4 <- estimateDispersions(dat.glia.batch4, cores = detectCores()-1)
 disp_table.glia.batch4 <- dispersionTable(dat.glia.batch4)
 disp_table.glia.batch4$gene_id <- as.character(disp_table.glia.batch4$gene_id)
-unsup_clustering_genes.glia.batch4 <- disp_table.glia.batch4[disp_table.glia.batch4$dispersion_empirical >= 1.4*(disp_table.glia.batch4$dispersion_fit), 'gene_id']
-dat.glia.batch4 <- setOrderingFilter(dat.glia.batch4, unsup_clustering_genes.glia.batch4)
-p.4 <- plot_ordering_genes(dat.glia.batch4) + ggtitle("Genes Overdispersed in Batch 4 - Glia Subset")
 
 dat.glia.batch5 <- dat.glia.expressed.normalized[,pData(dat.glia.expressed.normalized)$batch == "HD03_pool_3"]
 dat.glia.batch5 <- estimateSizeFactors(dat.glia.batch5)
 dat.glia.batch5 <- estimateDispersions(dat.glia.batch5, cores = detectCores() - 1)
 disp_table.glia.batch5 <- dispersionTable(dat.glia.batch5)
 disp_table.glia.batch5$gene_id <- as.character(disp_table.glia.batch5$gene_id)
-unsup_clustering_genes.glia.batch5 <- disp_table.glia.batch5[disp_table.glia.batch5$dispersion_empirical >= 1.4*(disp_table.glia.batch5$dispersion_fit), 'gene_id']
+
+unsup_clustering_genes.glia.batch1 <- disp_table.glia.batch1[disp_table.glia.batch1$dispersion_empirical >= 2.5*(disp_table.glia.batch1$dispersion_fit), 'gene_id']
+dat.glia.batch1 <- setOrderingFilter(dat.glia.batch1, unsup_clustering_genes.glia.batch1)
+
+unsup_clustering_genes.glia.batch2 <- disp_table.glia.batch2[disp_table.glia.batch2$dispersion_empirical >= 2.5*(disp_table.glia.batch2$dispersion_fit), 'gene_id']
+dat.glia.batch2 <- setOrderingFilter(dat.glia.batch2, unsup_clustering_genes.glia.batch2)
+
+unsup_clustering_genes.glia.batch3 <- disp_table.glia.batch3[disp_table.glia.batch3$dispersion_empirical >= 1.3*(disp_table.glia.batch3$dispersion_fit), 'gene_id']
+dat.glia.batch3 <- setOrderingFilter(dat.glia.batch3, unsup_clustering_genes.glia.batch3)
+
+unsup_clustering_genes.glia.batch4 <- disp_table.glia.batch4[disp_table.glia.batch4$dispersion_empirical >= 1.3*(disp_table.glia.batch4$dispersion_fit), 'gene_id']
+dat.glia.batch4 <- setOrderingFilter(dat.glia.batch4, unsup_clustering_genes.glia.batch4)
+
+unsup_clustering_genes.glia.batch5 <- disp_table.glia.batch5[disp_table.glia.batch5$dispersion_empirical >= 1.3*(disp_table.glia.batch5$dispersion_fit), 'gene_id']
 dat.glia.batch5 <- setOrderingFilter(dat.glia.batch5, unsup_clustering_genes.glia.batch5)
-p.5 <- plot_ordering_genes(dat.glia.batch5) + ggtitle("Genes Overdispersed in Batch 5 - Glia Subset")
 
-grid.arrange(p.1, p.2, p.3, p.4, p.5, nrow = 2)
-
-#calculate overall dispersions
-dat.glia.expressed.normalized <- estimateSizeFactors(dat.glia.expressed.normalized)
-dat.glia.expressed.normalized <- estimateDispersions(dat.glia.expressed.normalized)
-disp_table.glia <- dispersionTable(dat.glia.expressed.normalized)
-disp_table.glia$gene_id <- as.character(disp_table.glia$gene_id)
+#p.1 <- plot_ordering_genes(dat.glia.batch1) + ggtitle("Genes Overdispersed in Batch 1 - Glia Subset")
+#p.2 <- plot_ordering_genes(dat.glia.batch2) + ggtitle("Genes Overdispersed in Batch 2 - Glia Subset")
+#p.3 <- plot_ordering_genes(dat.glia.batch3) + ggtitle("Genes Overdispersed in Batch 3 - Glia Subset")
+#p.4 <- plot_ordering_genes(dat.glia.batch4) + ggtitle("Genes Overdispersed in Batch 4 - Glia Subset")
+#p.5 <- plot_ordering_genes(dat.glia.batch5) + ggtitle("Genes Overdispersed in Batch 5 - Glia Subset")
+#grid.arrange(p.1, p.2, p.3, p.4, p.5, nrow = 2)
 
 #limit to genes overdispersed in both batches and in the expressed gene set calculated earlier
-tmp1 <- intersect(unsup_clustering_genes.glia.batch1, unsup_clustering_genes.glia.batch2)
-tmp2 <- intersect(tmp1, unsup_clustering_genes.glia.batch3)
-tmp3 <- intersect(tmp2, unsup_clustering_genes.glia.batch4)
-unsup_clustering_genes_intersect.glia <- intersect(tmp3, unsup_clustering_genes.glia.batch5)
-#186 genes
+#tmp1 <- intersect(unsup_clustering_genes.glia.batch1, unsup_clustering_genes.glia.batch2)
+#tmp2 <- intersect(tmp1, unsup_clustering_genes.glia.batch3)
+#tmp3 <- intersect(tmp2, unsup_clustering_genes.glia.batch4)
+#unsup_clustering_expressed_genes.glia <- intersect(tmp3, unsup_clustering_genes.glia.batch5)
+length(intersect(unsup_clustering_genes.glia.batch1, unsup_clustering_genes.glia.batch2))
+length(intersect(intersect(unsup_clustering_genes.glia.batch3, unsup_clustering_genes.glia.batch4), unsup_clustering_genes.glia.batch5))
 
-unsup_clustering_expressed_genes.glia <- intersect(unsup_clustering_genes_intersect.glia, glia_expressed_genes)
+unsup_clustering_expressed_genes.glia <- unique(c(intersect(unsup_clustering_genes.glia.batch1, unsup_clustering_genes.glia.batch2), intersect(intersect(unsup_clustering_genes.glia.batch3, unsup_clustering_genes.glia.batch4), unsup_clustering_genes.glia.batch5)))
+
+length(unsup_clustering_expressed_genes.glia)
 #186 genes
 
 dat.glia.expressed.normalized <- setOrderingFilter(dat.glia.expressed.normalized, unsup_clustering_expressed_genes.glia)
@@ -747,11 +754,7 @@ p.expressed <- plot_ordering_genes(dat.glia.expressed.normalized) + ggtitle("Gen
 #grid.arrange(p.1,p.2,p.3,p.4,p.5,p.intersect,p.expressed,ncol=3)
 ```
 
-################
-# STOPPED HERE
-################
-
-```{r glia_PCA_tSNE}
+```{r glia_PCA}
 glia.pca <- prcomp(t(log10(exprs(dat.glia[glia_expressed_genes,]) + 1)), center = T)
 
 ggbiplot(glia.pca, var.axes = F, groups = pData(dat.glia)$batch, ellipse = T) + 
@@ -768,6 +771,77 @@ ggbiplot(glia.pca.unsup_genes, var.axes = F, groups = pData(dat.glia)$batch, ell
 
 # Glia tSNE represents cell cycle
 # Top2a, Tubb3, Ccnd1, Ccnd2, Ccnb1, Cks1b, Mad2l1
+```
+
+```{r glia_UMAP}
+embedding <- umap(t(log10(exprs(dat.glia.expressed.normalized) + 1)), n_neighbors = 15L)
+
+pData(dat.glia.expressed.normalized)$UMAP1 <- embedding$UMAP1
+pData(dat.glia.expressed.normalized)$UMAP2 <- embedding$UMAP2
+
+ggplot(pData(dat.glia.expressed.normalized), aes(x = UMAP1, y = UMAP2, color = batch)) +
+  geom_point(size = 1) +
+  stat_ellipse() +
+  scale_color_brewer("Batch", palette = "Set1") +
+  theme_classic() +
+  ggtitle("Umap on 14,273 expressed genes in the glia subset")
+
+pData(dat.glia.expressed.normalized)[pData(dat.glia.expressed.normalized)$batch %in% c("HD01", "HD02"),] %>%
+  mutate(group=paste(sex, genotype, batch)) %>%
+  ggplot(., aes(x = UMAP1, y = UMAP2, color = group)) +
+  geom_point(size = 1) +
+  stat_ellipse() +
+  scale_color_brewer(palette = "Set1") +
+  theme_classic()
+
+embedding <- umap(t(log10(exprs(dat.glia.expressed.normalized[unsup_clustering_expressed_genes.glia,]) + 1)), n_neighbors = 20L)
+
+pData(dat.glia.expressed.normalized)$UMAP1 <- embedding$UMAP1
+pData(dat.glia.expressed.normalized)$UMAP2 <- embedding$UMAP2
+
+ggplot(pData(dat.glia.expressed.normalized), aes(x = UMAP1, y = UMAP2, color = batch)) +
+  geom_point() +
+  stat_ellipse() +
+  scale_color_brewer(palette = "Set1")
+
+
+#UMAP on PCA on overdispersed genes
+
+glia_unsup_clustering.pca <- prcomp(t(log10(exprs(dat.glia.expressed.normalized)[unsup_clustering_expressed_genes.glia,] + 1)), scale = T, center = T)
+
+screeplot(glia_unsup_clustering.pca, type = "lines", npcs = 20)
+
+ggbiplot(glia_unsup_clustering.pca, var.axes = F, groups = pData(dat.glia)$batch, ellipse = T) + 
+  scale_color_brewer("Batch", palette = "Set1") + 
+  ggtitle("PCA on 855 genes overdispersed in the glia subset\nPost-normalization") + 
+  theme(aspect.ratio = 1)
+
+#PC1 = batch
+# 2:5 is too few
+# 2:13 and 2:14 is too much
+pca.embedding <- umap(glia_unsup_clustering.pca$x[, c(2:10)], random_state = 1L, n_neighbors = 50L, min_dist = 0.09)
+
+pData(dat.glia.expressed.normalized)$UMAP1 <- pca.embedding$UMAP1
+pData(dat.glia.expressed.normalized)$UMAP2 <- pca.embedding$UMAP2
+
+ggplot(pData(dat.glia.expressed.normalized), aes(x = UMAP1, y = UMAP2, color = genotype)) +
+  geom_point() +
+  scale_color_brewer(palette = "Set1") +
+  ggtitle("n_neighbors = 50L, min_dist = 0.09, random_state = 1L, PC 2:10")
+
+pData(dat.glia)$UMAP1 <- pca.embedding$UMAP1
+pData(dat.glia)$UMAP2 <- pca.embedding$UMAP2
+```
+
+```{r Mclust_clustering_glia}
+m <- Mclust(data = pData(dat.glia)[c("UMAP1", "UMAP2")], G = 4)
+plot(m)
+pData(dat.glia)$cluster <- as.factor(m$classification)
+
+ggplot(pData(dat.glia), aes(x = UMAP1, y = UMAP2, color = cluster)) +
+  geom_point(size = 1) +
+#  scale_color_brewer(palette = "Set1") +
+  theme_classic()
 ```
 
 ```{r glia_DDRTree}
@@ -808,57 +882,61 @@ plot_genes_branched_heatmap(dat.glia[neuron_BEAM_sigGenes,],branch_point=5,show_
 
 
 ```{r glia_DE_wrt_genotype}
-glia_genotype_diff_test<-differentialGeneTest(dat.glia[glia_expressed_genes,], fullModelFormulaStr = "~num_genes_expressed+genotype", reducedModelFormulaStr = "~num_genes_expressed", cores=detectCores()-1)
+glia_genotype_diff_test <- differentialGeneTest(dat.glia[glia_expressed_genes,], fullModelFormulaStr = "~batch + sex + CellType +genotype", reducedModelFormulaStr = "~batch + sex + CellType", cores = detectCores()-1)
 
-glia_genotype_diff_test_sorted<-glia_genotype_diff_test[order(glia_genotype_diff_test$qval),]
+glia_genotype_diff_test_sorted <- glia_genotype_diff_test[order(glia_genotype_diff_test$qval),]
 
-glia_genotype_diff_test_sigGenes<-rownames(glia_genotype_diff_test_sorted[glia_genotype_diff_test_sorted$qval <= 1e-4,])
+glia_genotype_diff_test_sigGenes <- rownames(glia_genotype_diff_test_sorted[glia_genotype_diff_test_sorted$qval <= 0.01,])
 
-heatmap_annotation<-pData(dat.glia)[,c("CellType","genotype","sex","Cluster")]
+heatmap_annotation <- pData(dat.glia)[, c("CellType", "genotype", "sex", "cluster")]
 
-heatmap_colors<-list(
-"Cell Type" =  c("Progenitor/Glia"="#e41a1c","Ambiguous"="#999999"),
-"Genotype" = c("het" = "#7FC97F", "hom" = "#BEAED4"),
+heatmap_colors <- list(
+"Cell Type" =  c("Progenitor/Glia" = "#984EA3", "Transition Cell" = "#FF7F00"),
+"Genotype" = c("het" = "#E41A1C", "hom" = "#377EB8"),
 "Sex" = c("female"="black","male"="#999999"),
-"Cluster" = c("1" = "#E41A1C", "2" = "#377EB8", "3" = "#4DAF4A", "4" = "#984EA3", "5" = "#FF7F00", "6" = "#FFFF33", "1" = "#A65628", "2" = "#F781BF", "3" = "#999999"))
+"Cluster" = c("1" = "#F8766D", "2" = "#7CAE00", "3" = "#00BFC4", "4" = "#C77CFF")
+)
 
 #writeLines(paste0('c("',paste(levels(pData(dat.glia)$Cluster),brewer.pal(9, "Set1"),sep='" = "', collapse='", "'),'")'))
 
 
-colnames(heatmap_annotation)<-c("Cell Type","Genotype","Sex","Cluster")
-heatmap_annotation<-heatmap_annotation %>%
-  select("Genotype","Cluster","Sex","Cell Type")
+colnames(heatmap_annotation) <- c("Cell Type","Genotype","Sex","Cluster")
+heatmap_annotation <- heatmap_annotation %>%
+  select("Genotype","Cluster","Sex","Cell Type") #order the columns
 
-tmp<-t(scale(t(exprs(dat.glia[glia_genotype_diff_test_sigGenes,])),scale=T,center=T))
-heatmap_data<-log(tmp -min(tmp) + 1)
+tmp <- t(scale(t(exprs(dat.glia[glia_genotype_diff_test_sigGenes,])), scale = T, center = T))
+heatmap_data <- log(tmp -min(tmp) + 1)
 #heatmap_data<-tmp -min(tmp)
-myLower<-(0)
-myUpper<-(3)
-heatmap_data[heatmap_data<myLower]<-myLower
-heatmap_data[heatmap_data>myUpper]<-myUpper
-rownames(heatmap_data)<-lookupGeneName(dat.glia,rownames(heatmap_data))
+#myLower<-(0)
+#myUpper<-(3)
+#heatmap_data[heatmap_data<myLower]<-myLower
+#heatmap_data[heatmap_data>myUpper]<-myUpper
+rownames(heatmap_data) <- lookupGeneName(dat.glia, rownames(heatmap_data))
 
-pdf("Heatmap_glia_wrt_genotype.pdf",height=36,width=17)
+#pdf("Heatmap_glia_wrt_genotype.pdf",height=36,width=17)
 pheatmap(mat = heatmap_data,
-         scale="none",
-         show_rownames=TRUE,
-         show_colnames=FALSE,
-         drop_levels=FALSE,
-         color = colorRampPalette(rev(brewer.pal(n = 11, name = "RdYlBu")))(100),
-#         color = colorRampPalette(c("blue","white","red"))(100),
-         breaks=seq(myLower,myUpper,length=100),
-         annotation_col=heatmap_annotation,
-         annotation_colors=heatmap_colors,
-         annotation_names_col=TRUE,
-         annotation_legend=TRUE,
-         border_color = NA
+         scale = "none",
+         show_rownames = TRUE,
+         show_colnames = FALSE,
+         drop_levels = FALSE,
+         #breaks = seq(myLower, myUpper, length = 100),
+         annotation_col = heatmap_annotation,
+         annotation_colors = heatmap_colors,
+         annotation_names_col = TRUE,
+         annotation_legend = TRUE,
+         border_color = NA,
+         fontsize = 8#,
+         #main = "Neurons\n84 Genes, 1% FDR\nFull model: ~ genotype + CellType + sex + batch\nReduced model: ~ CellType + sex + batch"
          )
-dev.off()
+#dev.off()
 ```
 
-```{r}
+```{r GOenrichment}
+library(org.Mm.eg.db)
+library(clusterProfiler)
 egENSEMBL <- toTable(org.Mm.egENSEMBL)
 
+#All DEG
 glia_genotype_diff_test_sigGenes_entrez <- gsub("\\..*","",glia_genotype_diff_test_sigGenes)
 m<-match(glia_genotype_diff_test_sigGenes_entrez,egENSEMBL$ensembl_id)
 glia_genotype_diff_test_sigGenes_entrez <- egENSEMBL$gene_id[m]
@@ -866,45 +944,50 @@ ego <- enrichGO(gene = glia_genotype_diff_test_sigGenes_entrez,
                 OrgDb =       'org.Mm.eg.db',
                 ont           = "BP",
                 pAdjustMethod = "none",
-                pvalueCutoff  = 0.01,
-                qvalueCutoff  = 1, 
-                readable      = TRUE)
-
-ego_MF <- enrichGO(gene = glia_genotype_diff_test_sigGenes_entrez,
-                OrgDb =       'org.Mm.eg.db',
-                ont           = "MF",
-                pAdjustMethod = "none",
-                pvalueCutoff  = 0.01,
-                qvalueCutoff  = 1, 
-                readable      = TRUE)
-
-ego_CC <- enrichGO(gene = glia_genotype_diff_test_sigGenes_entrez,
-                OrgDb =       'org.Mm.eg.db',
-                ont           = "CC",
-                pAdjustMethod = "none",
-                pvalueCutoff  = 0.01,
-                qvalueCutoff  = 1, 
+                qvalueCutoff  = 0.01,
+                pvalueCutoff  = 1, 
                 readable      = TRUE)
 
 
-#Convert ensembl ID to entrez ID
-#Run GO enrichment
-for(i in 1:length(modNames)){
-  assign(paste0(modNames[i],"_module_genes"), gsub("\\..*","",moduleGeneSets[[i]]))
-  m<-match(get(paste0(modNames[i],"_module_genes")),egENSEMBL$ensembl_id)
-  assign(paste0(modNames[i],"_module_genes"), egENSEMBL$gene_id[m])
-  assign(paste0("ego_",modNames[i]), enrichGO(gene= get(paste0(modNames[i],"_module_genes")),
+# Subset by direction of change
+glia_het_means <- apply(exprs(dat.glia)[glia_genotype_diff_test_sigGenes, pData(dat.glia)$genotype == "het"], 1, mean)
+glia_hom_means <- apply(exprs(dat.glia)[glia_genotype_diff_test_sigGenes,pData(dat.glia)$genotype == "hom"], 1,mean)
+
+glia_genotype_relative_exprs <- glia_het_means/glia_hom_means
+
+glia_upregulated_in_het <- names(glia_genotype_relative_exprs[glia_genotype_relative_exprs > 1 | glia_genotype_relative_exprs == "Inf"])
+
+glia_downregulated_in_het <- names(glia_genotype_relative_exprs[glia_genotype_relative_exprs < 1])
+
+
+
+glia_upregulated_in_het_entrez <- gsub("\\..*", "", glia_upregulated_in_het)
+m <- match(glia_upregulated_in_het_entrez, egENSEMBL$ensembl_id)
+glia_upregulated_in_het_entrez <- egENSEMBL$gene_id[m]
+ego_glia_upregulated <- enrichGO(gene = glia_upregulated_in_het_entrez,
                 OrgDb =       'org.Mm.eg.db',
                 ont           = "BP",
                 pAdjustMethod = "none",
-                pvalueCutoff  = 0.01,
-                qvalueCutoff  = 1, 
-                readable      = TRUE))
-  }
+                qvalueCutoff  = 0.01,
+                pvalueCutoff  = 1, 
+                readable      = TRUE)
+
+glia_downregulated_in_het_entrez <- gsub("\\..*", "", glia_downregulated_in_het)
+m <- match(glia_downregulated_in_het_entrez, egENSEMBL$ensembl_id)
+glia_downregulated_in_het_entrez <- egENSEMBL$gene_id[m]
+ego_glia_downregulated <- enrichGO(gene = glia_downregulated_in_het_entrez,
+                OrgDb =       'org.Mm.eg.db',
+                ont           = "BP",
+                pAdjustMethod = "none",
+                qvalueCutoff  = 0.01,
+                pvalueCutoff  = 1, 
+                readable      = TRUE)
+
+
 ```
 
 ```{r glia_DE_wrt_Cluster}
-glia_cluster_diff_test<-differentialGeneTest(dat.glia[glia_expressed_genes,], fullModelFormulaStr = "~batch+Cluster", reducedModelFormulaStr = "~batch", cores=detectCores()-1)
+glia_cluster_diff_test<-differentialGeneTest(dat.glia[glia_expressed_genes,], fullModelFormulaStr = "~batch + sex + genotype + CellType + cluster", reducedModelFormulaStr = "~batch + sex + genotype + CellType", cores=detectCores()-1)
 
 glia_cluster_diff_test_sorted<-glia_cluster_diff_test[order(glia_cluster_diff_test$qval),]
 
@@ -950,47 +1033,48 @@ dev.off()
 ```
 
 ```{r Hox_gene_expr}
-plot_genes_violin(dat.filtered[fData(dat.filtered)$gene_short_name %in% c("Hoxa1", "Hoxd1", "Hoxa2", "Hoxb2", "Hoxa3", "Hoxb3", "Hoxd3", "Hoxa4", "Hoxb4", "Hoxc4", "Hoxd4", "Hoxa5", "Hoxb5", "Hoxc5", "Hoxa6", "Hoxb6", "Hoxc6", "Hoxa7", "Hoxb7", "Hoxb8", "Hoxc8", "Hoxd8", "Hoxa9", "Hoxb9", "Hoxc9", "Hoxd9", "Hoxa10", "Hoxc10", "Hoxd10"),], grouping = "Cluster", relative_expr = F, color_by = "Cluster", nrow = 5, ncol = 6, panel_order = c("Hoxa1", "Hoxd1", "Hoxa2", "Hoxb2", "Hoxa3", "Hoxb3", "Hoxd3", "Hoxa4", "Hoxb4", "Hoxc4", "Hoxd4", "Hoxa5", "Hoxb5", "Hoxc5", "Hoxa6", "Hoxb6", "Hoxc6", "Hoxa7", "Hoxb7", "Hoxb8", "Hoxc8", "Hoxd8", "Hoxa9", "Hoxb9", "Hoxc9", "Hoxd9", "Hoxa10", "Hoxc10", "Hoxd10"))
+plot_genes_violin(dat.filtered[fData(dat.filtered)$gene_short_name %in% c("Hoxa1", "Hoxd1", "Hoxa2", "Hoxb2", "Hoxa3", "Hoxb3", "Hoxd3", "Hoxa4", "Hoxb4", "Hoxc4", "Hoxd4", "Hoxa5", "Hoxb5", "Hoxc5", "Hoxa6", "Hoxb6", "Hoxc6", "Hoxa7", "Hoxb7", "Hoxb8", "Hoxc8", "Hoxd8", "Hoxa9", "Hoxb9", "Hoxc9", "Hoxd9", "Hoxa10", "Hoxc10", "Hoxd10"),], grouping = "cluster", relative_expr = F, color_by = "cluster", nrow = 5, ncol = 6, panel_order = c("Hoxa1", "Hoxd1", "Hoxa2", "Hoxb2", "Hoxa3", "Hoxb3", "Hoxd3", "Hoxa4", "Hoxb4", "Hoxc4", "Hoxd4", "Hoxa5", "Hoxb5", "Hoxc5", "Hoxa6", "Hoxb6", "Hoxc6", "Hoxa7", "Hoxb7", "Hoxb8", "Hoxc8", "Hoxd8", "Hoxa9", "Hoxb9", "Hoxc9", "Hoxd9", "Hoxa10", "Hoxc10", "Hoxd10"))
 
-tmp_expr <- exprs(dat.filtered)[fData(dat.filtered)$gene_short_name %in% c("Hoxa1", "Hoxd1", "Hoxa2", "Hoxb2", "Hoxa3", "Hoxb3", "Hoxd3", "Hoxa4", "Hoxb4", "Hoxc4", "Hoxd4", "Hoxa5", "Hoxb5", "Hoxc5", "Hoxa6", "Hoxb6", "Hoxc6", "Hoxa7", "Hoxb7", "Hoxb8", "Hoxc8", "Hoxd8", "Hoxa9", "Hoxb9", "Hoxc9", "Hoxd9", "Hoxa10", "Hoxc10", "Hoxd10"),]
+tmp_expr <- exprs(dat.filtered.expressed.normalized)[fData(dat.filtered.expressed.normalized)$gene_short_name %in% c("Hoxa1", "Hoxd1", "Hoxa2", "Hoxb2", "Hoxa3", "Hoxb3", "Hoxd3", "Hoxa4", "Hoxb4", "Hoxc4", "Hoxd4", "Hoxa5", "Hoxb5", "Hoxc5", "Hoxa6", "Hoxb6", "Hoxc6", "Hoxa7", "Hoxb7", "Hoxb8", "Hoxc8", "Hoxd8", "Hoxa9", "Hoxb9", "Hoxc9", "Hoxd9", "Hoxa10", "Hoxc10", "Hoxd10"),]
 
-tmp_expr <- log10(tmp_expr*10000/pData(dat.filtered)$total_mRNAs + 1)
+#tmp_expr <- log10(tmp_expr*10000/pData(dat.filtered)$total_mRNAs + 1)
 
 melted_df <- melt(tmp_expr)
 colnames(melted_df) <- c("gene_id","cell_id","value")
-melted_df <- merge(melted_df, pData(dat.filtered)[,c("State","Cluster","genotype","CellType","sex","age")], by.x = "cell_id", by.y = 0)
+melted_df <- merge(melted_df, pData(dat.filtered)[,c("cluster","genotype","CellType","sex","age")], by.x = "cell_id", by.y = 0)
 
 #######
 # CLUSTER
 ######
 
 mean_expr_cluster <- melted_df %>%
-  group_by(Cluster, gene_id) %>%
+  group_by(cluster, gene_id) %>%
   summarise(mean_expression = mean(value), sd_expression = sd(value)) %>%
   as.data.frame()
 
 for(i in 1:11){
-  mean_expr_cluster[mean_expr_cluster$Cluster == i, "sem_expression"] <- mean_expr_cluster[mean_expr_cluster$Cluster == i, "sd_expression"]/sqrt(table(pData(dat.filtered)$Cluster)[i])
+  mean_expr_cluster[mean_expr_cluster$cluster == i, "sem_expression"] <- mean_expr_cluster[mean_expr_cluster$cluster == i, "sd_expression"]/sqrt(table(pData(dat.filtered)$cluster)[i])
 }
 
 mean_expr_cluster$gene_short_name <- lookupGeneName(dat.filtered, as.character(mean_expr_cluster$gene_id))
 
-levels(mean_expr_cluster$Cluster)
-mean_expr_cluster$Cluster <- factor(mean_expr_cluster$Cluster,levels(mean_expr_cluster$Cluster)[c(5, 7, 8, 4, 3, 11, 1, 9, 10, 2, 6)])
+levels(mean_expr_cluster$cluster)
+mean_expr_cluster$cluster <- factor(mean_expr_cluster$cluster,levels(mean_expr_cluster$cluster)[c(10, 6, 1, 5, 3, 2, 7, 8, 9, 4, 11)])
 
-#ggplot(mean_expr_cluster, aes(x = Cluster, y = mean_expression, fill = Cluster)) +
-#  geom_col() + 
-#    facet_wrap(~gene_short_name, scales = "free") +
-#  geom_errorbar(aes(ymin=mean_expression-sem_expression, ymax=mean_expression+sem_expression))
+ggplot(mean_expr_cluster, aes(x = cluster, y = mean_expression, fill = cluster)) +
+  geom_col() + 
+    facet_wrap(~gene_short_name, scales = "free") +
+  geom_errorbar(aes(ymin=mean_expression-sem_expression, ymax=mean_expression+sem_expression))
 
 gene_list <- c("Hoxa1", "Hoxd1", "Hoxa2", "Hoxb2", "Hoxa3", "Hoxb3", "Hoxd3", "Hoxa4", "Hoxb4", "Hoxc4", "Hoxd4", "Hoxa5", "Hoxb5", "Hoxc5", "Hoxa6", "Hoxb6", "Hoxc6", "Hoxa7", "Hoxb7", "Hoxb8", "Hoxc8", "Hoxd8", "Hoxa9", "Hoxb9", "Hoxc9", "Hoxd9", "Hoxa10", "Hoxc10", "Hoxd10")
+gene_list <- gene_list[gene_list %in% lookupGeneName(dat.filtered, expressed_genes)]
 
 for(i in seq_along(gene_list)){
   #print(gene_list[i])
   assign(paste0("p", i), 
-         ggplot(mean_expr_cluster[mean_expr_cluster$gene_short_name == gene_list[i],], aes(x = Cluster, y = mean_expression, fill = reorder(Cluster, seq(1:11)))) +
+         ggplot(mean_expr_cluster[mean_expr_cluster$gene_short_name == gene_list[i],], aes(x = cluster, y = mean_expression, fill = reorder(cluster, seq(1:11)))) +
           geom_col() + 
-          geom_errorbar(aes(ymin=mean_expression-sem_expression, ymax=mean_expression+sem_expression)) +
+          geom_errorbar(aes(ymin = mean_expression-sem_expression, ymax = mean_expression+sem_expression)) +
           theme(legend.position = "none", plot.title = element_text(hjust= 0.5)) +
            ggtitle(gene_list[i])
   )
@@ -1004,14 +1088,108 @@ Hox_by_cluster <- plot_grid(p1, blank, blank, p2,
              p5, p6, blank, p7,
              p8, p9, p10, p11,
              p12, p13, p14, blank,
-             p15, p16, p17, blank,
-             p18, p19, blank, blank,
-             blank, p20, p21, p22,
-             p23, p24, p25, p26, 
-             p27, blank, p28, p29,
+             blank, p15, p16, blank,
+             p17, p18, blank, blank,
+             blank, p19, blank, blank,
+             p20, blank, p21, blank, 
+             p22, blank, p23, blank,
              ncol = 4)
 
 save_plot("Hox_genes_by_cluster.pdf", Hox_by_cluster, base_height = 40, base_width = 20)
+
+
+mean_expr_cluster <- melted_df %>%
+  group_by(cluster, genotype, gene_id) %>%
+  summarise(mean_expression = mean(value), sd_expression = sd(value)) %>%
+  as.data.frame()
+
+for(i in 1:11){
+  for(j in c("het", "hom")){
+  mean_expr_cluster[mean_expr_cluster$cluster == i & mean_expr_cluster$genotype == j, "sem_expression"] <- mean_expr_cluster[mean_expr_cluster$cluster == i  & mean_expr_cluster$genotype == j, "sd_expression"]/sqrt(table(pData(dat.filtered)$cluster, pData(dat.filtered)$genotype)[i, j])
+  }
+}
+
+mean_expr_cluster$gene_short_name <- lookupGeneName(dat.filtered, as.character(mean_expr_cluster$gene_id))
+
+levels(mean_expr_cluster$cluster)
+mean_expr_cluster$cluster <- factor(mean_expr_cluster$cluster,levels(mean_expr_cluster$cluster)[c(10, 6, 1, 5, 3, 2, 7, 8, 9, 4, 11)])
+
+for(i in seq_along(gene_list)){
+  assign(paste0("p", i), 
+         ggplot(mean_expr_cluster[mean_expr_cluster$gene_short_name == gene_list[i],], aes(x = cluster, y = mean_expression, fill = genotype)) +
+          geom_col(position = "dodge") + 
+          geom_errorbar(aes(ymin = mean_expression-sem_expression, ymax = mean_expression+sem_expression), position = position_dodge()) +
+          theme(legend.position = "none", plot.title = element_text(hjust= 0.5)) +
+           scale_fill_brewer(palette = "Set1") +
+           ggtitle(gene_list[i])
+  )
+}
+
+Hox_by_genotype_and_cluster <- plot_grid(p1, blank, blank, p2, 
+             p3, p4, blank, blank,
+             p5, p6, blank, p7,
+             p8, p9, p10, p11,
+             p12, p13, p14, blank,
+             blank, p15, p16, blank,
+             p17, p18, blank, blank,
+             blank, p19, blank, blank,
+             p20, blank, p21, blank, 
+             p22, blank, p23, blank,
+             ncol = 4)
+
+all_hox <- fData(dat.filtered)$gene_short_name[str_detect(fData(dat.filtered)$gene_short_name, "Hox[a-z][0-9]+$")]
+
+tmp_expr <- exprs(dat.filtered)[fData(dat.filtered)$gene_short_name %in% all_hox,]
+
+melted_df <- melt(tmp_expr)
+colnames(melted_df) <- c("gene_id","cell_id","value")
+melted_df <- merge(melted_df, pData(dat.filtered)[,c("cluster","genotype","CellType","sex","age")], by.x = "cell_id", by.y = 0)
+
+mean_expr_cluster <- melted_df %>%
+  group_by(cluster, gene_id) %>%
+  summarise(mean_expression = mean(value), sd_expression = sd(value)) %>%
+  as.data.frame()
+
+for(i in 1:11){
+  mean_expr_cluster[mean_expr_cluster$cluster == i, "sem_expression"] <- mean_expr_cluster[mean_expr_cluster$cluster == i, "sd_expression"]/sqrt(table(pData(dat.filtered)$cluster)[i])
+}
+
+mean_expr_cluster$gene_short_name <- lookupGeneName(dat.filtered, as.character(mean_expr_cluster$gene_id))
+
+levels(mean_expr_cluster$cluster)
+mean_expr_cluster$cluster <- factor(mean_expr_cluster$cluster,levels(mean_expr_cluster$cluster)[c(10, 6, 1, 5, 3, 2, 7, 8, 9, 4, 11)])
+
+all_hox <- all_hox[order(as.numeric(str_extract(all_hox, "[0-9]+")))]
+
+for(i in seq_along(all_hox)){
+  #print(gene_list[i])
+  assign(paste0("p", i), 
+         ggplot(mean_expr_cluster[mean_expr_cluster$gene_short_name == all_hox[i],], aes(x = cluster, y = mean_expression, fill = reorder(cluster, seq(1:11)))) +
+          geom_col() + 
+          geom_errorbar(aes(ymin = mean_expression-sem_expression, ymax = mean_expression+sem_expression)) +
+          theme(legend.position = "none", plot.title = element_text(hjust= 0.5)) +
+           ggtitle(all_hox[i])
+  )
+}
+
+paste0("p", 1:45, collapse = ", ")
+grid.arrange(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, p18, p19, p20, p21, p22, p23, p24, p25, p26, p27, p28, p29, p30, p31, p32, p33, p34, p35, p36, p37, p38, p39, p40, p41, p42, p43, p44, p45)
+#blank <- grid.rect(gp=gpar(col="white"))
+
+#library(cowplot)
+#Hox_by_cluster <- plot_grid(p1, blank, blank, p2, 
+#             p3, p4, blank, blank,
+#             p5, p6, blank, p7,
+#             p8, p9, p10, p11,
+#             p12, p13, p14, blank,
+#             blank, p15, p16, blank,
+#             p17, p18, blank, blank,
+#             blank, p19, blank, blank,
+#             p20, blank, p21, blank, 
+#             p22, blank, p23, blank,
+#             ncol = 4)
+
+#save_plot("Hox_genes_by_cluster.pdf", Hox_by_cluster, base_height = 40, base_width = 20)
 
 #######
 # STATE
@@ -1049,11 +1227,11 @@ Hox_by_state <- plot_grid(p1, blank, blank, p2,
              p5, p6, blank, p7,
              p8, p9, p10, p11,
              p12, p13, p14, blank,
-             p15, p16, p17, blank,
-             p18, p19, blank, blank,
-             blank, p20, p21, p22,
-             p23, p24, p25, p26, 
-             p27, blank, p28, p29,
+             blank, p15, p16, blank,
+             p17, p18, blank, blank,
+             blank, p19, blank, blank,
+             p20, blank, p21, blank, 
+             p22, blank, p23, blank,
              ncol = 4)
 
 save_plot("Hox_genes_by_state.pdf", Hox_by_state, base_height = 40, base_width = 20)
@@ -1089,11 +1267,11 @@ Hox_by_genotype <- plot_grid(p1, blank, blank, p2,
              p5, p6, blank, p7,
              p8, p9, p10, p11,
              p12, p13, p14, blank,
-             p15, p16, p17, blank,
-             p18, p19, blank, blank,
-             blank, p20, p21, p22,
-             p23, p24, p25, p26, 
-             p27, blank, p28, p29,
+             blank, p15, p16, blank,
+             p17, p18, blank, blank,
+             blank, p19, blank, blank,
+             p20, blank, p21, blank, 
+             p22, blank, p23, blank,
              ncol = 4)
 
 save_plot("Hox_genes_by_genotype.pdf", Hox_by_genotype, base_height = 40, base_width = 20)

@@ -294,7 +294,7 @@ cth<-addCellType(cth,"Acetylcholinergic Neuron",parent_cell_type_name = "Neuron"
 
 cth<-addCellType(cth,"Progenitor/Glia",classify_func=function(x){ x[lookupGeneId(dat.filtered.expressed.normalized,"Tubb3"),] < 30  | x[lookupGeneId(dat.filtered.expressed.normalized,"Fabp7"),]  > 30 })
 
-dat.filtered.expressed.normalized<-classifyCells(dat.filtered.expressed.normalized,cth)
+dat.filtered.expressed.normalized <- classifyCells(dat.filtered.expressed.normalized,cth)
 
 ggplot(pData(dat.filtered.expressed.normalized), aes(x = UMAP1, y = UMAP2, color = CellType)) +
   geom_point() +
