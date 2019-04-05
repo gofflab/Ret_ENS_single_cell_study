@@ -1201,3 +1201,22 @@ ggplot(tmp3, aes(x = UMAP1, y = UMAP2, color = parentCellType)) +
   geom_point() + 
   scale_color_brewer(palette = "Set1")
 ```
+
+
+```
+model <- readRDS("../Linnarsson_enteric_data/RFmodel.rds")
+test_dat <- pData(dat.filtered)
+test_dat <- test_dat[,45:114]
+colnames(test_dat) <- str_remove(colnames(test_dat), pattern = "Linnarsson_")
+test_dat <- apply(test_dat, 2, function(x){ (x-mean(x))/sd(x)})
+pData(dat.filtered)$pred <- predict(model, newdata = test_dat)
+
+subset_model <- readRDS("../Linnarsson_enteric_data/RFmodel_subset.rds")
+pData(dat.filtered)$subset_pred <- predict(subset_model, newdata = test_dat)
+pData(dat.fitlered)$subset_pred_description <- NA
+pData(dat.filtered)[pData(dat.filtered)$subset_pred %in% c("ENT4", "ENT5", "ENT6", "ENT9"), "subset_pred_description"] <- "Cholinergic enteric neurons"
+pData(dat.filtered)[pData(dat.filtered)$subset_pred %in% c("ENT1", "ENT2", "ENT3"), "subset_pred_description"] <- "Nitrergic enteric neurons"
+pData(dat.filtered)[pData(dat.filtered)$subset_pred %in% c("ENT7", "ENT8"), "subset_pred_description"] <- "Cholinergic enteric neurons, VGLUT2"
+pData(dat.filtered)[pData(dat.filtered)$subset_pred %in% c("ENTG1"), "subset_pred_description"] <- "Enteric glia, proliferating"
+pData(dat.filtered)[is.na(pData(dat.filtered)$subset_pred_description, "subset_pred_description"] <- "Enteric glia"
+```
