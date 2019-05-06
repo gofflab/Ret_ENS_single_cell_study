@@ -103,7 +103,7 @@ edges <- as.matrix(pData(dat.filtered)[,c("UMAP1", "UMAP2")])
 edges[,"UMAP1"] <- edges[,"UMAP1"] - min(edges[,"UMAP1"]) + 1
 edges[,"UMAP2"] <- edges[,"UMAP2"] - min(edges[,"UMAP2"]) + 1
 A <- get.adjacency(graph.edgelist(edges, directed=FALSE))
-f#A <- dist(pData(dat.filtered)[,c("UMAP1", "UMAP2")])
+#A <- dist(pData(dat.filtered)[,c("UMAP1", "UMAP2")])
 NetworkToolbox::louvain()
 ```
 
@@ -124,6 +124,36 @@ ldat <- lapply(ldat, function(x) { # filter to only expressed genes, instead of 
 
 cell.colors <- ifelse(pData(dat.filtered)$genotype == "het", "#E41A1C", "#377EB8")
 
+cell.colors <- rep(NA, 1003)
+names(cell.colors) <- pData(dat.filtered)$cell_id
+
+for(i in 1:1003){
+if(pData(dat.filtered)$CellType[i] == "Acetylcholinergic Neuron"){
+  cell.colors[i] <- "#E41A1C"
+}else if(pData(dat.filtered)$CellType[i] == "Neuron"){
+  cell.colors[i] <- "#377EB8"
+}else if(pData(dat.filtered)$CellType[i] == "Noradrenergic Neuron"){
+  cell.colors[i] <- "#4DAF4A"
+}else if(pData(dat.filtered)$CellType[i] == "Progenitor/Glia"){
+  cell.colors[i] <- "#984EA3"
+}else{
+  cell.colors[i] <- "#FF7F00"
+}
+}
+
+for(i in 1:1003){
+if(pData(dat.filtered)$batch[i] == "HD01"){
+  cell.colors[i] <- "#E41A1C"
+}else if(pData(dat.filtered)$batch[i] == "HD02"){
+  cell.colors[i] <- "#377EB8"
+}else if(pData(dat.filtered)$batch[i] == "HD03_pool_1"){
+  cell.colors[i] <- "#4DAF4A"
+}else if(pData(dat.filtered)$batch[i] == "HD03_pool_2"){
+  cell.colors[i] <- "#984EA3"
+}else{
+  cell.colors[i] <- "#FF7F00"
+}
+}
 
 names(cell.colors) <- pData(dat.filtered)$cell_id
 emb <- as.matrix(pData(dat.filtered)[,c("UMAP1", "UMAP2")])

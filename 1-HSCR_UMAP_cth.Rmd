@@ -294,12 +294,12 @@ cth<-addCellType(cth,"Acetylcholinergic Neuron",parent_cell_type_name = "Neuron"
 
 cth<-addCellType(cth,"Progenitor/Glia",classify_func=function(x){ x[lookupGeneId(dat.filtered.expressed.normalized,"Tubb3"),] < 30  | x[lookupGeneId(dat.filtered.expressed.normalized,"Fabp7"),]  > 30 })
 
-dat.filtered.expressed.normalized <- classifyCells(dat.filtered.expressed.normalized,cth)
+dat.filtered.expressed.normalized <- classifyCells(dat.filtered.expressed.normalized, cth, method = "markers-only")
 
 ggplot(pData(dat.filtered.expressed.normalized), aes(x = UMAP1, y = UMAP2, color = CellType)) +
   geom_point() +
   scale_color_manual(values = c("#E41A1C", "#F781BF", "#377EB8", "#4DAF4A", "#984EA3", "#999999")) +
-  theme_classic() +
+  theme_bw() +
   ggtitle("Umap on 419 genes post-normalization\nAnnotation based on normalized expression values only")
 
 pData(dat.filtered.expressed.normalized)[pData(dat.filtered.expressed.normalized)$cluster == 11, "CellType"] <- "Noradrenergic Neuron"

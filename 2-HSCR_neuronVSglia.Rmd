@@ -888,16 +888,18 @@ glia_genotype_diff_test_sorted <- glia_genotype_diff_test[order(glia_genotype_di
 
 glia_genotype_diff_test_sigGenes <- rownames(glia_genotype_diff_test_sorted[glia_genotype_diff_test_sorted$qval <= 0.01,])
 
-heatmap_annotation <- pData(dat.glia)[, c("CellType", "genotype", "sex", "cluster")]
+#heatmap_annotation <- pData(dat.glia)[, c("CellType", "genotype", "sex", "cluster")]
+heatmap_annotation <- merge(pData(dat.glia)[, c("CellType", "genotype", "sex")], pData(dat.filtered)[,"cluster", drop = F], by = 0)
+rownames(heatmap_annotation) <- heatmap_annotation[,1]
 
 heatmap_colors <- list(
 "Cell Type" =  c("Progenitor/Glia" = "#984EA3", "Transition Cell" = "#FF7F00"),
 "Genotype" = c("het" = "#E41A1C", "hom" = "#377EB8"),
 "Sex" = c("female"="black","male"="#999999"),
-"Cluster" = c("1" = "#F8766D", "2" = "#7CAE00", "3" = "#00BFC4", "4" = "#C77CFF")
+"Cluster" = c("1" = "#E41A1C", "2" = "#377EB8", "3" = "#4DAF4A", "4" = "#984EA3", "5" = "#FF7F00", "6" = "#FFFF33", "7" = "#A65628", "8" = "#F781BF", "9" = "#999999", "10" = "#E41A1C", "11" = "#377EB8")
 )
 
-#writeLines(paste0('c("',paste(levels(pData(dat.glia)$Cluster),brewer.pal(9, "Set1"),sep='" = "', collapse='", "'),'")'))
+#writeLines(paste0('c("',paste(levels(pData(dat.filtered)$cluster),brewer.pal(9, "Set1"),sep='" = "', collapse='", "'),'")'))
 
 
 colnames(heatmap_annotation) <- c("Cell Type","Genotype","Sex","Cluster")

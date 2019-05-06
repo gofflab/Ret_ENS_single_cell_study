@@ -911,7 +911,7 @@ dev.off()
 ```
 
 
-```{r proection_correlation}
+```{r projection_correlation}
 projection.cor <- cor(cor_meta, t(projection$projection))
 projection.cor <- projection.cor[,order.dendrogram(as.dendrogram(hclust(dist(t(projection.cor)))))]
 pmat.projection <- cor.mtest(cbind(cor_meta, t(projection$projection)))
@@ -1014,7 +1014,7 @@ corrplot(meta_cor, tl.col = "black", tl.srt = 0, method = "color", addgrid.col =
 
 
 ```{r UMAP_projection_weights}
-projection_embedding <- umap(t(projection$projection), random_state = 100L)
+projection_embedding <- umap(t(projection70$projection), random_state = 100L)
 
 ggplot(projection_embedding, aes(x = UMAP1, y = UMAP2, color = pData(dat.filtered)$CellType)) +
   geom_point() +
@@ -1032,6 +1032,172 @@ ggplot(projection_embedding, aes(x = UMAP1, y = UMAP2, color = pData(dat.filtere
   theme_classic()
 
 ```
+
+```{r}
+tmp <- t(projection70$projection*(1-projection70$pval)) # scale by 1-p value
+
+projection_embedding <- umap(tmp, random_state = 100L)
+
+ggplot(projection_embedding, aes(x = UMAP1, y = UMAP2, color = pData(dat.filtered)$CellType)) +
+  geom_point() +
+  scale_color_brewer(palette = "Set1") +
+  theme_classic()
+
+tmp <- t(projection70$projection)
+tmp <- apply(tmp, 2, function(x){ (x - mean(x)) / sd(x) }) # scale to mean 0 sd 1
+
+projection_embedding <- umap(tmp, random_state = 100L)
+
+ggplot(projection_embedding, aes(x = UMAP1, y = UMAP2, color = pData(dat.filtered)$CellType)) +
+  geom_point() +
+  scale_color_brewer(palette = "Set1") +
+  theme_classic()
+
+tmp <- tmp*t(1-projection70$pval) # then scale by p value
+
+projection_embedding <- umap(tmp, random_state = 100L)
+
+ggplot(projection_embedding, aes(x = UMAP1, y = UMAP2, color = pData(dat.filtered)$CellType)) +
+  geom_point() +
+  scale_color_brewer(palette = "Set1") +
+  theme_classic()
+```
+
+```{r projection_normalized_unsup_clustering}
+mat <- exprs(dat.filtered.expressed.normalized[unsup_clustering_expressed_genes,])
+rownames(mat) <- gsub("\\..*", "", rownames(mat))
+mat <- log10(mat+1)
+
+projection70_normalized <- projectR(mat, linnarsson70, AnnotionObj = NA, IDcol=NA,full=TRUE)
+
+tmp <- projection70_normalized$projection
+rownames(tmp) <- paste0("Linnarsson_", rownames(tmp))
+
+tmp <- t(tmp)
+
+identical(rownames(tmp), rownames(pData(dat.filtered)))
+
+tmp2 <- merge(pData(dat.filtered)[,c("UMAP1", "UMAP2")], tmp, by = 0, sort = FALSE)
+rownames(tmp2) <- tmp2$Row.names
+tmp2 <- tmp2[, -1]
+
+tmp <- dat.filtered
+pData(tmp) <- tmp2
+
+plotUMAP(tmp, color = "Linnarsson_Pattern_12") +
+  scale_color_viridis(option = "C")
+
+plot_list = list()
+for (i in 1:70) {
+    p = plotUMAP(tmp, color_by = paste0("Linnarsson_Pattern_", i)) + 
+      ggtitle(paste("Linnarsson Pattern", i)) +
+      scale_color_viridis("Projection\nWeight", option = "C")
+    plot_list[[i]] = p
+}
+
+pdf("UMAP_projections_normalized_np70.pdf")
+for (i in seq_along(plot_list)) {
+    print(plot_list[[i]])
+}
+dev.off()
+
+plot_list = list()
+for (i in 1:70) {
+    pval <- projection70_log$pval[i,]
+    value <- projection70_log$projection[i,]
+    p = plotUMAP(tmp, color_by = ifelse(pval < 0.05, value, NA), alpha = ifelse(pval < 0.05, 1, 0.1)) + 
+      ggtitle(paste("Linnarsson Pattern", i)) +
+      scale_color_viridis(option = "C")
+    plot_list[[i]] = p
+}
+
+pdf("UMAP_projections_log10_np70_significant.pdf")
+for (i in seq_along(plot_list)) {
+    print(plot_list[[i]])
+}
+dev.off()
+
+projection_embedding <- umap(t(projection70_normalized$projection), random_state = 100L)
+
+ggplot(projection_embedding, aes(x = UMAP1, y = UMAP2, color = pData(dat.filtered)$CellType)) +
+  geom_point() +
+  scale_color_brewer(palette = "Set1") +
+  theme_classic()
+
+projection_embedding <- umap(t(projection70_normalized$projection * (1-projection70_normalized$pval)), random_state = 100L)
+
+ggplot(projection_embedding, aes(x = UMAP1, y = UMAP2, color = pData(dat.filtered)$CellType)) +
+  geom_point() +
+  scale_color_brewer(palette = "Set1") +
+  theme_classic()
+```
+
+```{r projection_normalized_expressed}
+mat <- exprs(dat.filtered.expressed.normalized[expressed_genes,])
+rownames(mat) <- gsub("\\..*", "", rownames(mat))
+mat <- log10(mat+1)
+
+projection70_normalized_expressed <- projectR(mat, linnarsson70, AnnotionObj = NA, IDcol=NA,full=TRUE)
+
+tmp <- projection70_normalized_expressed$projection
+rownames(tmp) <- paste0("Linnarsson_", rownames(tmp))
+
+tmp <- t(tmp)
+
+identical(rownames(tmp), rownames(pData(dat.filtered)))
+
+tmp2 <- merge(pData(dat.filtered)[,c("UMAP1", "UMAP2")], tmp, by = 0, sort = FALSE)
+rownames(tmp2) <- tmp2$Row.names
+tmp2 <- tmp2[, -1]
+
+tmp <- dat.filtered
+pData(tmp) <- tmp2
+
+plot_list = list()
+for (i in 1:70) {
+    p = plotUMAP(tmp, color_by = paste0("Linnarsson_Pattern_", i)) + 
+      ggtitle(paste("Linnarsson Pattern", i)) +
+      scale_color_viridis("Projection\nWeight", option = "C")
+    plot_list[[i]] = p
+}
+
+pdf("UMAP_projections_normalized_np70.pdf")
+for (i in seq_along(plot_list)) {
+    print(plot_list[[i]])
+}
+dev.off()
+
+plot_list = list()
+for (i in 1:70) {
+    pval <- projection70_log$pval[i,]
+    value <- projection70_log$projection[i,]
+    p = plotUMAP(tmp, color_by = ifelse(pval < 0.05, value, NA), alpha = ifelse(pval < 0.05, 1, 0.1)) + 
+      ggtitle(paste("Linnarsson Pattern", i)) +
+      scale_color_viridis(option = "C")
+    plot_list[[i]] = p
+}
+
+pdf("UMAP_projections_log10_np70_significant.pdf")
+for (i in seq_along(plot_list)) {
+    print(plot_list[[i]])
+}
+dev.off()
+
+projection_embedding <- umap(t(projection70_normalized_expressed$projection), random_state = 100L)
+
+ggplot(projection_embedding, aes(x = UMAP1, y = UMAP2, color = pData(dat.filtered)$CellType)) +
+  geom_point() +
+  scale_color_brewer(palette = "Set1") +
+  theme_classic()
+
+projection_embedding <- umap(t(projection70_normalized_expressed$projection * (1-projection70_normalized_expressed$pval)), random_state = 100L)
+
+ggplot(projection_embedding, aes(x = UMAP1, y = UMAP2, color = pData(dat.filtered)$CellType)) +
+  geom_point() +
+  scale_color_brewer(palette = "Set1") +
+  theme_classic()
+```
+
 
 ```{r classifier}
 predictor_patterns <- as.data.frame(read.csv("predictor_patterns.csv", stringsAsFactors = F))
@@ -1203,20 +1369,305 @@ ggplot(tmp3, aes(x = UMAP1, y = UMAP2, color = parentCellType)) +
 ```
 
 
-```
+```{r RF_model_class}
 model <- readRDS("../Linnarsson_enteric_data/RFmodel.rds")
-test_dat <- pData(dat.filtered)
-test_dat <- test_dat[,45:114]
-colnames(test_dat) <- str_remove(colnames(test_dat), pattern = "Linnarsson_")
+
+test_dat <- t(projection70$projection)
 test_dat <- apply(test_dat, 2, function(x){ (x-mean(x))/sd(x)})
-pData(dat.filtered)$pred <- predict(model, newdata = test_dat)
+tmp <- dat.filtered
+pData(tmp)$pred <- predict(model, newdata = test_dat)
+
+###############
 
 subset_model <- readRDS("../Linnarsson_enteric_data/RFmodel_subset.rds")
-pData(dat.filtered)$subset_pred <- predict(subset_model, newdata = test_dat)
-pData(dat.fitlered)$subset_pred_description <- NA
-pData(dat.filtered)[pData(dat.filtered)$subset_pred %in% c("ENT4", "ENT5", "ENT6", "ENT9"), "subset_pred_description"] <- "Cholinergic enteric neurons"
-pData(dat.filtered)[pData(dat.filtered)$subset_pred %in% c("ENT1", "ENT2", "ENT3"), "subset_pred_description"] <- "Nitrergic enteric neurons"
-pData(dat.filtered)[pData(dat.filtered)$subset_pred %in% c("ENT7", "ENT8"), "subset_pred_description"] <- "Cholinergic enteric neurons, VGLUT2"
-pData(dat.filtered)[pData(dat.filtered)$subset_pred %in% c("ENTG1"), "subset_pred_description"] <- "Enteric glia, proliferating"
-pData(dat.filtered)[is.na(pData(dat.filtered)$subset_pred_description, "subset_pred_description"] <- "Enteric glia"
+
+###############
+test_dat <- t(projection70$projection)
+test_dat <- apply(test_dat, 2, function(x){ (x-mean(x))/sd(x)})
+
+pData(tmp)$subset_pred <- predict(subset_model, newdata = test_dat)
+pData(tmp)$subset_pred_description <- NA
+pData(tmp)[pData(tmp)$subset_pred %in% c("ENT4", "ENT5", "ENT6", "ENT9"), "subset_pred_description"] <- "Cholinergic enteric neurons"
+pData(tmp)[pData(tmp)$subset_pred %in% c("ENT1", "ENT2", "ENT3"), "subset_pred_description"] <- "Nitrergic enteric neurons"
+pData(tmp)[pData(tmp)$subset_pred %in% c("ENT7", "ENT8"), "subset_pred_description"] <- "Cholinergic enteric neurons, VGLUT2"
+pData(tmp)[pData(tmp)$subset_pred %in% c("ENTG1"), "subset_pred_description"] <- "Enteric glia, proliferating"
+pData(tmp)[is.na(pData(tmp)$subset_pred_description), "subset_pred_description"] <- "Enteric glia"
+
+celltypeprobs <- predict(subset_model, newdata = test_dat, type = "prob")
+melted_ctp <- melt(celltypeprobs)
+max_prob <- as.data.frame(apply(celltypeprobs, 1, max))
+names(max_prob) <- "prob"
+mean(max_prob$prob)
+
+pdf("classification1.pdf", width = 10)
+plotUMAP(tmp, color = "subset_pred") + 
+  theme(aspect.ratio = 1)
+plotUMAP(tmp, color = "subset_pred_description") + 
+  theme(aspect.ratio = 1)
+plotUMAP(tmp, color = max_prob$prob) + 
+  scale_color_viridis("Max probability") + 
+  theme(aspect.ratio = 1)
+ggplot(melted_ctp) + 
+  geom_density(aes(x = value, color = variable))
+ggplot(max_prob) + 
+  geom_density(aes(x = prob)) +
+  geom_vline(xintercept = mean(max_prob$prob), lty = 2)jk
+ggplot(pData(tmp), aes(x = subset_pred_description)) + 
+  geom_bar(aes(fill = subset_pred)) + 
+  scale_fill_manual("Cluster\nClassification", values = colorRampPalette(brewer.pal(9, "Set1"))(length(unique(pData(tmp)$subset_pred)))) +
+  geom_text(stat = "count", aes(label = ..count..), vjust = -0.5) +
+  scale_y_continuous(expand = expand_scale(mult = c(0, .05))) +
+  scale_x_discrete("Description Classification", labels = c("Cholinergic\nenteric\nneurons", "Cholinergic\nenteric\nneurons,\nVGLUT2", "Enteric glia", "Nitrergic\nenteric\nneurons"))
+dev.off()
+
+###############
+test_dat <- t(projection70$projection * (1-projection70$pval))
+test_dat <- apply(test_dat, 2, function(x){ (x-mean(x))/sd(x)})
+
+pData(tmp)$subset_pred <- predict(subset_model, newdata = test_dat)
+pData(tmp)$subset_pred_description <- NA
+pData(tmp)[pData(tmp)$subset_pred %in% c("ENT4", "ENT5", "ENT6", "ENT9"), "subset_pred_description"] <- "Cholinergic enteric neurons"
+pData(tmp)[pData(tmp)$subset_pred %in% c("ENT1", "ENT2", "ENT3"), "subset_pred_description"] <- "Nitrergic enteric neurons"
+pData(tmp)[pData(tmp)$subset_pred %in% c("ENT7", "ENT8"), "subset_pred_description"] <- "Cholinergic enteric neurons, VGLUT2"
+pData(tmp)[pData(tmp)$subset_pred %in% c("ENTG1"), "subset_pred_description"] <- "Enteric glia, proliferating"
+pData(tmp)[is.na(pData(tmp)$subset_pred_description), "subset_pred_description"] <- "Enteric glia"
+
+celltypeprobs <- predict(subset_model, newdata = test_dat, type = "prob")
+melted_ctp <- melt(celltypeprobs)
+max_prob <- as.data.frame(apply(celltypeprobs, 1, max))
+names(max_prob) <- "prob"
+mean(max_prob$prob)
+
+pdf("classification2.pdf", width = 10)
+plotUMAP(tmp, color = "subset_pred") + 
+  theme(aspect.ratio = 1)
+plotUMAP(tmp, color = "subset_pred_description") + 
+  theme(aspect.ratio = 1)
+plotUMAP(tmp, color = max_prob$prob) + 
+  scale_color_viridis("Max probability") + 
+  theme(aspect.ratio = 1)
+ggplot(melted_ctp) + 
+  geom_density(aes(x = value, color = variable))
+ggplot(max_prob) + 
+  geom_density(aes(x = prob))
+ggplot(pData(tmp), aes(x = subset_pred_description)) + 
+  geom_bar(aes(fill = subset_pred)) + 
+  scale_fill_manual("Cluster\nClassification", values = colorRampPalette(brewer.pal(9, "Set1"))(length(unique(pData(tmp)$subset_pred)))) +
+  geom_text(stat = "count", aes(label = ..count..), vjust = -0.5) +
+  scale_y_continuous(expand = expand_scale(mult = c(0, .05))) +
+  scale_x_discrete("Description Classification", labels = c("Cholinergic\nenteric\nneurons", "Cholinergic\nenteric\nneurons,\nVGLUT2", "Enteric glia", "Nitrergic\nenteric\nneurons"))
+dev.off()
+
+###############
+test_dat <- t(projection70_normalized$projection)
+test_dat <- apply(test_dat, 2, function(x){ (x-mean(x))/sd(x)})
+
+pData(tmp)$subset_pred <- predict(subset_model, newdata = test_dat)
+pData(tmp)$subset_pred_description <- NA
+pData(tmp)[pData(tmp)$subset_pred %in% c("ENT4", "ENT5", "ENT6", "ENT9"), "subset_pred_description"] <- "Cholinergic enteric neurons"
+pData(tmp)[pData(tmp)$subset_pred %in% c("ENT1", "ENT2", "ENT3"), "subset_pred_description"] <- "Nitrergic enteric neurons"
+pData(tmp)[pData(tmp)$subset_pred %in% c("ENT7", "ENT8"), "subset_pred_description"] <- "Cholinergic enteric neurons, VGLUT2"
+pData(tmp)[pData(tmp)$subset_pred %in% c("ENTG1"), "subset_pred_description"] <- "Enteric glia, proliferating"
+pData(tmp)[is.na(pData(tmp)$subset_pred_description), "subset_pred_description"] <- "Enteric glia"
+
+celltypeprobs <- predict(subset_model, newdata = test_dat, type = "prob")
+melted_ctp <- melt(celltypeprobs)
+max_prob <- as.data.frame(apply(celltypeprobs, 1, max))
+names(max_prob) <- "prob"
+mean(max_prob$prob)
+
+pdf("classification3.pdf", width = 10)
+plotUMAP(tmp, color = "subset_pred") + 
+  theme(aspect.ratio = 1)
+plotUMAP(tmp, color = "subset_pred_description") + 
+  theme(aspect.ratio = 1)
+plotUMAP(tmp, color = max_prob$prob) + 
+  scale_color_viridis("Max probability") + 
+  theme(aspect.ratio = 1)
+ggplot(melted_ctp) + 
+  geom_density(aes(x = value, color = variable))
+ggplot(max_prob) + 
+  geom_density(aes(x = prob))
+ggplot(pData(tmp), aes(x = subset_pred_description)) + 
+  geom_bar(aes(fill = subset_pred)) + 
+  scale_fill_manual("Cluster\nClassification", values = colorRampPalette(brewer.pal(9, "Set1"))(length(unique(pData(tmp)$subset_pred)))) +
+  geom_text(stat = "count", aes(label = ..count..), vjust = -0.5) +
+  scale_y_continuous(expand = expand_scale(mult = c(0, .05))) +
+  scale_x_discrete("Description Classification", labels = c("Cholinergic\nenteric\nneurons", "Cholinergic\nenteric\nneurons,\nVGLUT2", "Enteric glia", "Nitrergic\nenteric\nneurons"))
+dev.off()
+
+###############
+test_dat <- t(projection70_normalized$projection * (1-projection70_normalized$pval))
+test_dat <- apply(test_dat, 2, function(x){ (x-mean(x))/sd(x)})
+
+pData(tmp)$subset_pred <- predict(subset_model, newdata = test_dat)
+pData(tmp)$subset_pred_description <- NA
+pData(tmp)[pData(tmp)$subset_pred %in% c("ENT4", "ENT5", "ENT6", "ENT9"), "subset_pred_description"] <- "Cholinergic enteric neurons"
+pData(tmp)[pData(tmp)$subset_pred %in% c("ENT1", "ENT2", "ENT3"), "subset_pred_description"] <- "Nitrergic enteric neurons"
+pData(tmp)[pData(tmp)$subset_pred %in% c("ENT7", "ENT8"), "subset_pred_description"] <- "Cholinergic enteric neurons, VGLUT2"
+pData(tmp)[pData(tmp)$subset_pred %in% c("ENTG1"), "subset_pred_description"] <- "Enteric glia, proliferating"
+pData(tmp)[is.na(pData(tmp)$subset_pred_description), "subset_pred_description"] <- "Enteric glia"
+
+celltypeprobs <- predict(subset_model, newdata = test_dat, type = "prob")
+melted_ctp <- melt(celltypeprobs)
+max_prob <- as.data.frame(apply(celltypeprobs, 1, max))
+names(max_prob) <- "prob"
+mean(max_prob$prob)
+
+pdf("classification4.pdf", width = 10)
+plotUMAP(tmp, color = "subset_pred") + 
+  theme(aspect.ratio = 1)
+plotUMAP(tmp, color = "subset_pred_description") + 
+  theme(aspect.ratio = 1)
+plotUMAP(tmp, color = max_prob$prob) + 
+  scale_color_viridis("Max probability") + 
+  theme(aspect.ratio = 1)
+ggplot(melted_ctp) + 
+  geom_density(aes(x = value, color = variable))
+ggplot(max_prob) + 
+  geom_density(aes(x = prob))
+ggplot(pData(tmp), aes(x = subset_pred_description)) + 
+  geom_bar(aes(fill = subset_pred)) + 
+  scale_fill_manual("Cluster\nClassification", values = colorRampPalette(brewer.pal(9, "Set1"))(length(unique(pData(tmp)$subset_pred)))) +
+  geom_text(stat = "count", aes(label = ..count..), vjust = -0.5) +
+  scale_y_continuous(expand = expand_scale(mult = c(0, .05))) +
+  scale_x_discrete("Description Classification", labels = c("Cholinergic\nenteric\nneurons", "Cholinergic\nenteric\nneurons,\nVGLUT2", "Enteric glia", "Nitrergic\nenteric\nneurons"))
+dev.off()
+
+###############
+test_dat <- t(projection70_normalized_expressed$projection)
+test_dat <- apply(test_dat, 2, function(x){ (x-mean(x))/sd(x)})
+
+pData(tmp)$subset_pred <- predict(subset_model, newdata = test_dat)
+pData(tmp)$subset_pred_description <- NA
+pData(tmp)[pData(tmp)$subset_pred %in% c("ENT4", "ENT5", "ENT6", "ENT9"), "subset_pred_description"] <- "Cholinergic enteric neurons"
+pData(tmp)[pData(tmp)$subset_pred %in% c("ENT1", "ENT2", "ENT3"), "subset_pred_description"] <- "Nitrergic enteric neurons"
+pData(tmp)[pData(tmp)$subset_pred %in% c("ENT7", "ENT8"), "subset_pred_description"] <- "Cholinergic enteric neurons, VGLUT2"
+pData(tmp)[pData(tmp)$subset_pred %in% c("ENTG1"), "subset_pred_description"] <- "Enteric glia, proliferating"
+pData(tmp)[is.na(pData(tmp)$subset_pred_description), "subset_pred_description"] <- "Enteric glia"
+
+celltypeprobs <- predict(subset_model, newdata = test_dat, type = "prob")
+melted_ctp <- melt(celltypeprobs)
+max_prob <- as.data.frame(apply(celltypeprobs, 1, max))
+names(max_prob) <- "prob"
+mean(max_prob$prob)
+
+pdf("classification5.pdf", width = 10)
+plotUMAP(tmp, color = "subset_pred") + 
+  theme(aspect.ratio = 1)
+plotUMAP(tmp, color = "subset_pred_description") + 
+  theme(aspect.ratio = 1)
+plotUMAP(tmp, color = max_prob$prob) + 
+  scale_color_viridis("Max probability") + 
+  theme(aspect.ratio = 1)
+ggplot(melted_ctp) + 
+  geom_density(aes(x = value, color = variable))
+ggplot(max_prob) + 
+  geom_density(aes(x = prob))
+ggplot(pData(tmp), aes(x = subset_pred_description)) + 
+  geom_bar(aes(fill = subset_pred)) + 
+  scale_fill_manual("Cluster\nClassification", values = colorRampPalette(brewer.pal(9, "Set1"))(length(unique(pData(tmp)$subset_pred)))) +
+  geom_text(stat = "count", aes(label = ..count..), vjust = -0.5) +
+  scale_y_continuous(expand = expand_scale(mult = c(0, .05))) +
+  scale_x_discrete("Description Classification", labels = c("Cholinergic\nenteric\nneurons", "Cholinergic\nenteric\nneurons,\nVGLUT2", "Enteric glia", "Nitrergic\nenteric\nneurons"))
+dev.off()
+
+###############
+test_dat <- t(projection70_normalized_expressed$projection * (1-projection70_normalized_expressed$pval))
+test_dat <- apply(test_dat, 2, function(x){ (x-mean(x))/sd(x)})
+
+pData(tmp)$subset_pred <- predict(subset_model, newdata = test_dat)
+pData(tmp)$subset_pred_description <- NA
+pData(tmp)[pData(tmp)$subset_pred %in% c("ENT4", "ENT5", "ENT6", "ENT9"), "subset_pred_description"] <- "Cholinergic enteric neurons"
+pData(tmp)[pData(tmp)$subset_pred %in% c("ENT1", "ENT2", "ENT3"), "subset_pred_description"] <- "Nitrergic enteric neurons"
+pData(tmp)[pData(tmp)$subset_pred %in% c("ENT7", "ENT8"), "subset_pred_description"] <- "Cholinergic enteric neurons, VGLUT2"
+pData(tmp)[pData(tmp)$subset_pred %in% c("ENTG1"), "subset_pred_description"] <- "Enteric glia, proliferating"
+pData(tmp)[is.na(pData(tmp)$subset_pred_description), "subset_pred_description"] <- "Enteric glia"
+
+celltypeprobs <- predict(subset_model, newdata = test_dat, type = "prob")
+melted_ctp <- melt(celltypeprobs)
+max_prob <- as.data.frame(apply(celltypeprobs, 1, max))
+names(max_prob) <- "prob"
+mean(max_prob$prob)
+
+pdf("classification6.pdf", width = 10)
+plotUMAP(tmp, color = "subset_pred") + 
+  theme(aspect.ratio = 1)
+plotUMAP(tmp, color = "subset_pred_description") + 
+  theme(aspect.ratio = 1)
+plotUMAP(tmp, color = max_prob$prob) + 
+  scale_color_viridis("Max probability") + 
+  theme(aspect.ratio = 1)
+ggplot(melted_ctp) + 
+  geom_density(aes(x = value, color = variable))
+ggplot(max_prob) + 
+  geom_density(aes(x = prob))
+ggplot(pData(tmp), aes(x = subset_pred_description)) + 
+  geom_bar(aes(fill = subset_pred)) + 
+  scale_fill_manual("Cluster\nClassification", values = colorRampPalette(brewer.pal(9, "Set1"))(length(unique(pData(tmp)$subset_pred)))) +
+  geom_text(stat = "count", aes(label = ..count..), vjust = -0.5) +
+  scale_y_continuous(expand = expand_scale(mult = c(0, .05))) +
+  scale_x_discrete("Description Classification", labels = c("Cholinergic\nenteric\nneurons", "Cholinergic\nenteric\nneurons,\nVGLUT2", "Enteric glia", "Nitrergic\nenteric\nneurons"))
+dev.off()
+```
+
+
+```{r classification_1}
+test_dat <- t(projection70$projection)
+test_dat <- apply(test_dat, 2, function(x){ (x-mean(x))/sd(x)})
+
+pData(tmp)$subset_pred <- predict(subset_model, newdata = test_dat)
+pData(tmp)$subset_pred_description <- NA
+pData(tmp)[pData(tmp)$subset_pred %in% c("ENT4", "ENT5", "ENT6", "ENT9"), "subset_pred_description"] <- "Cholinergic enteric neurons"
+pData(tmp)[pData(tmp)$subset_pred %in% c("ENT1", "ENT2", "ENT3"), "subset_pred_description"] <- "Nitrergic enteric neurons"
+pData(tmp)[pData(tmp)$subset_pred %in% c("ENT7", "ENT8"), "subset_pred_description"] <- "Cholinergic enteric neurons, VGLUT2"
+pData(tmp)[pData(tmp)$subset_pred %in% c("ENTG1"), "subset_pred_description"] <- "Enteric glia, proliferating"
+pData(tmp)[is.na(pData(tmp)$subset_pred_description), "subset_pred_description"] <- "Enteric glia"
+
+#pdf("classification1.pdf", width = 10)
+plotUMAP(dat.filtered, color = "CellType") +
+  scale_color_manual("Cell Type", values = c(cbPalette[c(1:3, 6)], "#999999")) +
+  theme(aspect.ratio = 1, legend.position = c(0.8, 0.2))
+plotUMAP(tmp, color = "subset_pred_description") + 
+  scale_color_manual("Cell Type", values = cbPalette[c(1, 5, 6, 7)]) +
+  theme(aspect.ratio = 1, , legend.position = c(0.7, 0.2))
+#dev.off()
+
+plotUMAP(dat.filtered, color = "cluster") +
+  scale_color_manual("Cluster", values = colorRampPalette(brewer.pal(9, "Set1"))(11), guide = guide_legend(ncol = 2)) +
+  theme(aspect.ratio = 1, legend.position = c(0.8, 0.2))
+
+tmp <- cluster_specificity[cluster_specificity$cluster == 4, ]
+ggplot(tmp, aes(x = log10(mean_expr + 1), y = specificity, label = ifelse(tmp$gene_short_name %in% c("Tac1", "Ecel1", "Scng", "Th", "Chgb", "Mapt", "Prph", "Stmn3", "Sncg", "Snap25", "Meg3", "Stmn2", "Rtn1"), tmp$gene_short_name, ""))) +
+    geom_point() +
+    geom_smooth() +
+    geom_text(nudge_y = 0.015) +
+    ggtitle(paste("Specificity for Cluster 4")) +
+  theme(aspect.ratio = 1)
+
+tmp <- cluster_specificity[cluster_specificity$cluster == 9, ]
+ggplot(tmp, aes(x = log10(mean_expr + 1), y = specificity, label = ifelse(tmp$gene_short_name %in% c("Nos1", "Ntng1", "Sncg", "Mapt", "Prph", "Vip", "Cartpt", "Myl1", "Etv1"), tmp$gene_short_name, ""))) +
+    geom_point() +
+    geom_smooth() +
+    geom_text(nudge_y = 0.015) +
+    ggtitle(paste("Specificity for Cluster 9")) +
+  theme(aspect.ratio = 1)
+
+tmp <- cluster_specificity[cluster_specificity$cluster == 10, ]
+ggplot(tmp, aes(x = log10(mean_expr + 1), y = specificity, label = ifelse(tmp$gene_short_name %in% c("Plp1", "Myl9", "Fabp7", "Postn", "Sox5", "Gja1", "Tagln", "Pls3", "Gpc3", "Sparc", "Ccnd2", "Matn4"), tmp$gene_short_name, ""))) +
+    geom_point() +
+    geom_smooth() +
+    geom_text(nudge_y = 0.015) +
+    ggtitle(paste("Specificity for Cluster 10")) +
+  theme(aspect.ratio = 1)
+
+ggplot(pData(dat.filtered)) +
+  geom_bar(aes(x = cluster, fill = genotype), position = "dodge") +
+  scale_fill_brewer("Genotype", palette = "Set1") +
+  labs(x = "Cluster", y = "Count")
+
+ggplot(pData(dat.filtered)[pData(dat.filtered)$cluster %in% c(4, 9),]) +
+  geom_bar(aes(x = cluster, fill = genotype), position = "dodge") +
+  scale_fill_brewer("Genotype", palette = "Set1") +
+  labs(x = "Cluster", y = "Count")
 ```
