@@ -1,0 +1,456 @@
+---
+title: "HSCR CoGAPS"
+author: "Liz Vincent"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: pdf_document
+---
+
+```{r}
+load("/Users/Liz/Documents/Hopkins/Goff\ Lab/Chakravarti/CoGAPS/np25_dat.filtered.expressed.normalized_result.RData")
+np25.gapsResult <- gapsResult
+row.names(np25.gapsResult@sampleFactors) <- colnames(exprs(dat.filtered.expressed.normalized))
+row.names(np25.gapsResult@featureLoadings) <- rownames(exprs(dat.filtered.expressed.normalized))
+row.names(np25.gapsResult@sampleStdDev) <- colnames(exprs(dat.filtered.expressed.normalized))
+row.names(np25.gapsResult@featureStdDev) <- rownames(exprs(dat.filtered.expressed.normalized))
+rownames(np25.gapsResult@featureLoadings) <- gsub("\\..*", "", rownames(np25.gapsResult@featureLoadings))
+rownames(np25.gapsResult@featureStdDev) <- gsub("\\..*", "", rownames(np25.gapsResult@featureStdDev))
+```
+
+```{r UMAP_by_pattern_weight}
+plot_list = list()
+for (i in 1:25) {
+      p = plotUMAP(dat.filtered, color_by = np25.gapsResult@sampleFactors[,i]) + 
+        ggtitle(paste("Pattern", i)) + 
+        labs(color = "Pattern\nWeight") +
+        theme(aspect.ratio = 1)
+      plot_list[[i]] = p
+}
+pdf(paste0("np25.pdf"))
+  for (i in seq_along(plot_list)) {
+      print(plot_list[[i]])
+}
+dev.off()
+```
+
+```{r correlation_matrices}
+np25cor <- cor(np25.gapsResult@sampleFactors)
+plot(as.dendrogram(hclust(dist(t(np25cor)))))
+
+#One-hot encode numeric traits
+tmp <- pData(dat.filtered)[,c("genotype", "sex", "age", "CellType", "batch", "cluster")]
+tmp <- tmp %>%
+  mutate(condition = paste(age, genotype, sex))
+dmy <- dummyVars("~.", data = tmp)
+cor_meta <- data.frame(predict(dmy, newdata = tmp))
+
+cor_meta <- cbind(cor_meta, pData(dat.filtered)[,c("total_mass","total_reads", "alignment_percentage", "num_genes_expressed", "total_mRNAs", "mean_expr","sd_expr")])
+
+library(corrplot)
+
+np25.cor <- cor(cor_meta, np25.gapsResult@sampleFactors)
+np25.cor <- np25.cor[,order.dendrogram(as.dendrogram(hclust(dist(t(np25.cor)))))]
+pmat <- cor.mtest(cbind(cor_meta, np25.gapsResult@sampleFactors))
+#pmat <- pmat$p[1:dim(np25.cor)[1], (dim(np25.cor)[1] + 1):(dim(np25.cor)[1] + dim(np25.gapsResult@sampleFactors)[2])]
+pmat <- pmat$p
+rownames(pmat) <- colnames(cbind(cor_meta, np25.gapsResult@sampleFactors))
+colnames(pmat) <- colnames(cbind(cor_meta, np25.gapsResult@sampleFactors))
+pmat <- pmat[rownames(np25.cor), colnames(np25.cor)]
+cutoff <- .05/(dim(np25.cor)[1]*dim(np25.cor)[2])
+colnames(np25.cor) <- str_replace(colnames(np25.cor), "_", " ")
+rownames(np25.cor) <- str_to_title(str_replace_all(rownames(np25.cor), "_", " "))
+corrplot(np25.cor, tl.col = "black", tl.srt = 45, method = "color", addgrid.col = "grey20", p.mat = pmat, sig.level = cutoff, insig = "blank", bg = "grey80")
+#plot(as.dendrogram(hclust(dist(t(np25.cor)))))
+
+##### Check p-values by shuffling mat
+
+ptest_df <- cor_meta
+ptest_df[,] <- NA
+
+for(i in seq_along(cor_meta)){
+ ptest_df[,i] <- sample(cor_meta[,i])
+}
+
+pmat.ptest <- cor.mtest(cbind(ptest_df, np25.gapsResult@sampleFactors))
+pmat.ptest <- pmat.ptest$p
+rownames(pmat.ptest) <- colnames(cbind(ptest_df, np25.gapsResult@sampleFactors))
+colnames(pmat.ptest) <- colnames(cbind(ptest_df, np25.gapsResult@sampleFactors))
+pmat.ptest <- pmat.ptest[colnames(ptest_df), colnames(np25.gapsResult@sampleFactors)]
+
+pmat.ptest_melted <- melt(as.data.frame(pmat.ptest))
+
+ggplot(pmat.ptest_melted) +
+  geom_histogram(aes(x = value), binwidth = 0.02)
+
+#####run multiple permutations
+
+ptest_df <- cor_meta
+ptest_df[,] <- NA
+bigMat <- list()
+
+for(j in 1:100){
+  
+  for(i in seq_along(cor_meta)){
+   ptest_df[,i] <- sample(cor_meta[,i])
+  }
+
+  pmat.ptest <- cor.mtest(cbind(ptest_df, np25.gapsResult@sampleFactors))
+  pmat.ptest <- pmat.ptest$p
+  rownames(pmat.ptest) <- colnames(cbind(ptest_df, np25.gapsResult@sampleFactors))
+  colnames(pmat.ptest) <- colnames(cbind(ptest_df, np25.gapsResult@sampleFactors))
+  pmat.ptest <- pmat.ptest[colnames(ptest_df), colnames(np25.gapsResult@sampleFactors)]
+  
+  bigMat[[j]] <- pmat.ptest
+}
+  
+bigMat_melted <- melt(bigMat)
+
+ggplot(bigMat_melted) +
+  geom_histogram(aes(x = value), binwidth = 0.05)
+
+ggplot(bigMat_melted) +
+  geom_histogram(aes(x = value), binwidth = 0.05) +
+  facet_wrap(~Var2)
+
+ggplot(bigMat_melted) +
+  geom_histogram(aes(x = value), binwidth = 0.05) +
+  facet_wrap(~Var1)
+
+melted_patterns <- melt(np25.gapsResult@sampleFactors)
+
+ggplot(melted_patterns) +
+  geom_density(aes(x = value, color = Var2))
+
+```
+
+```{r patternMarkers}
+np25patternMarkers <- patternMarkers(np25.gapsResult)
+names(np25patternMarkers$PatternMarkers) <- paste0("Pattern_", seq(1:25))
+
+for(i in seq_along(np25patternMarkers)){
+  print(head(np25patternMarkers[[i]]))
+}
+
+save_patternmarkers <- function(np){
+  object <- get(paste0("np", np, "patternMarkers"))
+  object <- object$PatternMarkers
+  nrow <- max(unlist(lapply(object, length)))
+  mat <- matrix(NA, nrow = nrow, ncol = np)
+  for(i in 1:np){
+    object[[i]] <- lookupGeneName(dat.filtered, object[[i]])
+    mat[,i] <- c(object[[i]], rep("", nrow - length(object[[i]])))
+  }
+  mat <- as.data.frame(mat)
+  names(mat) <- paste("pattern", seq(1:np))
+  write_excel_csv(mat, path = paste0("patternMarkers", np, ".csv"))
+}
+
+save_patternmarkers(25)
+```
+
+```{r GSEA_with_cogaps}
+# example
+library('limma')
+library('org.Mm.eg.db')
+library('KEGG.db')
+library('GO.db')
+library('DT')
+library('ComplexHeatmap')
+library('AnnotationDbi')
+
+Z <- gsub("\\..*","", expressed_genes)
+
+ENSEMBLToKEGG <- mapIds(org.Mm.eg.db,keys=Z,column='PATH',keytype = 'ENSEMBL',multiVals = list)
+ENSEMBLToKEGG <- sapply(reverseSplit(ENSEMBLToKEGG),unique)
+ENSEMBLToKEGG <- ENSEMBLToKEGG[sapply(ENSEMBLToKEGG,length)>5]
+ENSEMBLToKEGG <- ENSEMBLToKEGG[sapply(ENSEMBLToKEGG,length)<=100]
+
+ENSEMBLToGO <- AnnotationDbi::select(org.Mm.eg.db, keys = Z,columns = c("GO","ONTOLOGY"), keytype = "ENSEMBL")
+ENSEMBLToGO <- ENSEMBLToGO[,c("ENSEMBL", "GO", "ONTOLOGY")]
+ENSEMBLToGO <- unique(ENSEMBLToGO)
+ENSEMBLToGO <- ENSEMBLToGO[ENSEMBLToGO$ONTOLOGY == "BP", ]
+ENSEMBLToGO <- ENSEMBLToGO[,c("ENSEMBL", "GO")]
+ENSEMBLToGO <- tapply(ENSEMBLToGO$ENSEMBL,ENSEMBLToGO$GO,list)
+#ENSEMBLToGO <- sapply(reverseSplit(ENSEMBLToGO),unique)
+ENSEMBLToGO <- ENSEMBLToGO[sapply(ENSEMBLToGO,length) > 10]
+ENSEMBLToGO <- ENSEMBLToGO[sapply(ENSEMBLToGO,length)<=100]
+
+np25_CGstats <- calcCoGAPSStat(np25.gapsResult, GStoGenes = ENSEMBLToGO, numPerm = 1000)
+
+write.csv(CGstats,file=paste("CoGAPSStat.",gsName,".",AName,"nP",dim(Aneu)[2],".csv",sep=""))#,col.names=c("GSDownreg","GSUpreg"))
+  ls("package:KEGG.db")
+significantTerms <- function(np){
+  GOTerms = list()
+  assign("CGstats", get(paste0("np", np, "_CGstats")))
+for(i in 1:np){
+  GSDownreg = stack(sort(CGstats$GSDownreg[i,])[sort(CGstats$GSDownreg[i,]) < 0.05])
+  colnames(GSDownreg) = c("pval", "GOID")
+  Term = AnnotationDbi::select(GO.db, keys = as.character(GSDownreg$GOID), column = 'TERM', keytype = 'GOID')
+  GSDownreg = merge(GSDownreg, Term, by = "GOID", sort = F)
+  
+  GSUpreg = stack(sort(CGstats$GSUpreg[i,])[sort(CGstats$GSUpreg[i,]) < 0.05])
+  colnames(GSUpreg) = c("pval", "GOID")
+  Term = AnnotationDbi::select(GO.db, keys = as.character(GSUpreg$GOID), column = 'TERM', keytype = 'GOID')
+  GSUpreg = merge(GSUpreg, Term, by = "GOID", sort = F)
+  
+  GOTerms[[paste0("Patt", i)]] = list("Downreg" = GSDownreg, "Upreg" = GSUpreg)
+}
+  return(GOTerms)
+}
+
+np25_GOTerms <- significantTerms(25)
+
+top50genes <- apply(np20.gapsResult@featureLoadings, 2, function(x){lookupGeneName(dat.filtered, rownames(np20.gapsResult@featureLoadings[order(x, decreasing = T),])[1:50])})
+```
+
+
+```{r corr_plot_GOTerms}
+Upreg_sigTerms <- np20_CGstats$GSUpreg[,apply(np20_CGstats$GSUpreg, 2, function(x){sum(x < 0.05) > 0})] #subset terms significant (p < 0.05) in at least 1 pattern
+
+Downreg_sigTerms <- np20_CGstats$GSDownreg[,apply(np20_CGstats$GSDownreg, 2, function(x){sum(x < 0.05) > 0})] #subset terms significant (p < 0.05) in at least 1 pattern
+
+Upreg_sigTerms_clustered <- Upreg_sigTerms[order.dendrogram(as.dendrogram(hclust(dist(Upreg_sigTerms)))), order.dendrogram(as.dendrogram(hclust(dist(t(Upreg_sigTerms)))))]
+
+Upreg_sigTerms_clustered <- t(Upreg_sigTerms_clustered)
+
+Upreg_sigTerms_TERM <- AnnotationDbi::select(GO.db, keys = as.character(rownames(Upreg_sigTerms_clustered)), column = 'TERM', keytype = 'GOID')
+
+Upreg_names <- paste(Upreg_sigTerms_TERM$GOID, Upreg_sigTerms_TERM$TERM)
+
+Upreg_corrplot_obj <- Upreg_sigTerms_clustered
+rownames(Upreg_corrplot_obj) <- Upreg_names
+
+Downreg_sigTerms_clustered <- Downreg_sigTerms[order.dendrogram(as.dendrogram(hclust(dist(Downreg_sigTerms)))), order.dendrogram(as.dendrogram(hclust(dist(t(Downreg_sigTerms)))))]
+
+Downreg_sigTerms_clustered <- t(Downreg_sigTerms_clustered)
+
+Downreg_sigTerms_TERM <- AnnotationDbi::select(GO.db, keys = as.character(rownames(Downreg_sigTerms_clustered)), column = 'TERM', keytype = 'GOID')
+
+Downreg_names <- paste(Downreg_sigTerms_TERM$GOID, Downreg_sigTerms_TERM$TERM)
+
+Downreg_corrplot_obj <- Downreg_sigTerms_clustered
+rownames(Downreg_corrplot_obj) <- Downreg_names
+
+pdf("Upreg_corplot.pdf", height = 600, width = 20)
+corrplot(Upreg_corrplot_obj, col = "#053061", tl.col = "black", tl.srt = 45, method = "color", addgrid.col = "grey20", p.mat = Upreg_corrplot_obj, sig.level = 0.05, insig = "blank", bg = "grey80", tl.cex = 1)
+dev.off()
+
+pdf("Downreg_corplot.pdf", height = 500, width = 20)
+corrplot(Downreg_corrplot_obj, col = "#67001F", tl.col = "black", tl.srt = 45, method = "color", addgrid.col = "grey20", p.mat = Downreg_corrplot_obj, sig.level = 0.05, insig = "blank", bg = "grey80")
+dev.off()
+```
+
+```{r Linnarsson_projectR_np70}
+linnarsson70 <- readRDS("Linnarsson_np70.rds")
+
+mat <- exprs(dat.filtered[expressed_genes,])
+rownames(mat) <- gsub("\\..*", "", rownames(mat))
+mat <- log10(mat+1)
+
+projection70 <- projectR(mat, linnarsson70, AnnotionObj = NA, IDcol=NA,full=TRUE)
+
+tmp <- projection70$projection
+rownames(tmp) <- paste0("Linnarsson_", rownames(tmp))
+
+tmp <- t(tmp)
+
+identical(rownames(tmp), rownames(pData(dat.filtered)))
+
+pData(dat.filtered) <- cbind(pData(dat.filtered), tmp)
+
+tmp2 <- merge(pData(dat.filtered)[,c("UMAP1", "UMAP2")], tmp, by = 0, sort = FALSE)
+rownames(tmp2) <- tmp2$Row.names
+tmp2 <- tmp2[, -1]
+
+tmp <- dat.filtered
+pData(tmp) <- tmp2
+
+plot_list = list()
+for (i in 1:70) {
+    p = plotUMAP(tmp, color_by = paste0("Linnarsson_Pattern_", i)) + 
+      ggtitle(paste("Linnarsson Pattern", i)) +
+      scale_color_viridis("Projection\nWeight", option = "C")
+    plot_list[[i]] = p
+}
+
+pdf("UMAP_projections_np70.pdf")
+for (i in seq_along(plot_list)) {
+    print(plot_list[[i]])
+}
+dev.off()
+
+plot_list = list()
+for (i in 1:70) {
+    pval <- projection70$pval[i,]
+    value <- projection70$projection[i,]
+    p = plotUMAP(dat.filtered, color_by = ifelse(pval < 0.05, value, NA), alpha = ifelse(pval < 0.05, 1, 0.1)) + 
+      ggtitle(paste("Linnarsson Pattern", i)) +
+      scale_color_viridis(option = "C")
+    plot_list[[i]] = p
+}
+
+pdf("UMAP_projections_np70_significant.pdf")
+for (i in seq_along(plot_list)) {
+    print(plot_list[[i]])
+}
+dev.off()
+```
+
+
+```{r}
+#merge projectR weights with glia and neuron CDS as well
+tmp <- projection$projection
+rownames(tmp) <- paste0("Linnarsson_", rownames(tmp))
+tmp <- t(tmp)
+glia_tmp <- tmp[rownames(tmp) %in% rownames(pData(dat.glia)),]
+glia_tmp <- merge(pData(dat.glia), glia_tmp, by = 0, sort = F)
+rownames(glia_tmp) <- glia_tmp$Row.names
+glia_tmp <- glia_tmp[, -1]
+pData(dat.glia) <- glia_tmp
+
+neurons_tmp <- tmp[rownames(tmp) %in% rownames(pData(dat.neurons)),]
+neurons_tmp <- merge(pData(dat.neurons), neurons_tmp, by = 0, sort = F)
+rownames(neurons_tmp) <- neurons_tmp$Row.names
+neurons_tmp <- neurons_tmp[, -1]
+pData(dat.neurons) <- neurons_tmp
+
+plotUMAP(dat.glia, color = "Linnarsson_Pattern_27") + scale_color_viridis(option = "C")
+
+glia_list = list()
+neuron_list = list()
+for (i in 1:50) {
+    pval <- projection$pval[i,]
+    value <- projection$projection[i,]
+    p = plotUMAP(dat.glia, color_by = paste0("Linnarsson_Pattern_", i)) + 
+      ggtitle(paste("Linnarsson Pattern", i)) +
+      scale_color_viridis(option = "C")
+    glia_list[[i]] = p
+    q = plotUMAP(dat.neurons, color_by = paste0("Linnarsson_Pattern_", i)) + 
+      ggtitle(paste("Linnarsson Pattern", i)) +
+      scale_color_viridis(option = "C")
+    neuron_list[[i]] = q
+}
+
+
+pdf("UMAP_neuron_glia_projection.pdf", width = 16)
+for (i in seq_along(plot_list)) {
+    print(grid.arrange(glia_list[[i]], neuron_list[[i]], nrow = 1), nrow = 1)
+}
+dev.off()
+
+glia_list = list()
+neuron_list = list()
+for (i in 1:50) {
+    glia_pval <- projection$pval[i, colnames(projection$pval) %in% rownames(pData(dat.glia))]
+    glia_value <- projection$projection[i,colnames(projection$projection) %in% rownames(pData(dat.glia))]
+    
+    p = plotUMAP(dat.glia, color_by = ifelse(glia_pval < 0.05, glia_value, NA), alpha = ifelse(glia_pval < 0.05, 1, 0.1)) + 
+      ggtitle(paste("Linnarsson Pattern", i)) +
+      scale_color_viridis(option = "C")
+    glia_list[[i]] = p
+    
+    neuron_pval <- projection$pval[i, colnames(projection$pval) %in% rownames(pData(dat.neurons))]
+    neuron_value <- projection$projection[i, colnames(projection$projection) %in% rownames(pData(dat.neurons))]
+    q = plotUMAP(dat.neurons, color_by = ifelse(neuron_pval < 0.05, neuron_value, NA), alpha = ifelse(neuron_pval < 0.05, 1, 0.1)) + 
+      ggtitle(paste("Linnarsson Pattern", i)) +
+      scale_color_viridis(option = "C")
+    neuron_list[[i]] = q
+}
+
+pdf("UMAP_neuron_glia_projection_significant.pdf", width = 16)
+for (i in seq_along(plot_list)) {
+    print(grid.arrange(glia_list[[i]], neuron_list[[i]], nrow = 1), nrow = 1)
+}
+dev.off()
+```
+
+```{r projection_correlation}
+projection.cor <- cor(cor_meta, t(projection$projection))
+projection.cor <- projection.cor[,order.dendrogram(as.dendrogram(hclust(dist(t(projection.cor)))))]
+pmat.projection <- cor.mtest(cbind(cor_meta, t(projection$projection)))
+#pmat <- pmat$p[1:dim(np20.cor)[1], (dim(np20.cor)[1] + 1):(dim(np20.cor)[1] + dim(np20.gapsResult@sampleFactors)[2])]
+pmat.projection <- pmat.projection$p
+rownames(pmat.projection) <- colnames(cbind(cor_meta, t(projection$projection)))
+colnames(pmat.projection) <- colnames(cbind(cor_meta, t(projection$projection)))
+pmat.projection <- pmat.projection[rownames(projection.cor), colnames(projection.cor)]
+cutoff <- .05/(dim(projection.cor)[1]*dim(projection.cor)[2])
+colnames(projection.cor) <- str_replace(colnames(projection.cor), "Pattern_", "")
+rownames(projection.cor) <- str_to_title(str_replace_all(rownames(projection.cor), "_", " "))
+corrplot(projection.cor, tl.col = "black", tl.srt = 0, method = "color", addgrid.col = "grey20", p.mat = pmat.projection, sig.level = cutoff, insig = "blank", bg = "grey80")
+#plot(as.dendrogram(hclust(dist(t(np20.cor)))))
+
+projection.cor.hclust <- cor(cor_meta, t(projection$projection))
+projection.cor.hclust <- projection.cor.hclust[order.dendrogram(as.dendrogram(hclust(dist(projection.cor.hclust)))),order.dendrogram(as.dendrogram(hclust(dist(t(projection.cor.hclust)))))]
+pmat.projection <- cor.mtest(cbind(cor_meta, t(projection$projection)))
+#pmat <- pmat$p[1:dim(np20.cor)[1], (dim(np20.cor)[1] + 1):(dim(np20.cor)[1] + dim(np20.gapsResult@sampleFactors)[2])]
+pmat.projection <- pmat.projection$p
+rownames(pmat.projection) <- colnames(cbind(cor_meta, t(projection$projection)))
+colnames(pmat.projection) <- colnames(cbind(cor_meta, t(projection$projection)))
+pmat.projection.hclust <- pmat.projection[rownames(projection.cor.hclust), colnames(projection.cor.hclust)]
+cutoff <- .05/(dim(projection.cor)[1]*dim(projection.cor)[2])
+colnames(projection.cor.hclust) <- str_replace(colnames(projection.cor.hclust), "Pattern_", "")
+rownames(projection.cor.hclust) <- str_to_title(str_replace_all(rownames(projection.cor.hclust), "_", " "))
+rownames(pmat.projection.hclust) <- rownames(projection.cor.hclust)
+colnames(pmat.projection.hclust) <- colnames(projection.cor.hclust)
+
+projection.cor.hclust <- projection.cor.hclust[c(1:8, 13:17, 22, 25:26, 28:31, 35, 37:42, 46),]
+pmat.projection.hclust <- pmat.projection.hclust[c(1:8, 13:17, 22, 25:26, 28:31, 35, 37:42, 46),]
+cutoff <- .05/(dim(projection.cor.hclust)[1]*dim(projection.cor.hclust)[2])
+
+projection.cor.hclust <- projection.cor.hclust[order.dendrogram(as.dendrogram(hclust(dist(projection.cor.hclust)))),order.dendrogram(as.dendrogram(hclust(dist(t(projection.cor.hclust)))))]
+pmat.projection.hclust <- pmat.projection.hclust[rownames(projection.cor.hclust), colnames(projection.cor.hclust)]
+
+corrplot(projection.cor.hclust, tl.col = "black", tl.srt = 0, method = "color", addgrid.col = "grey20", p.mat = pmat.projection.hclust, sig.level = cutoff, insig = "blank", bg = "grey80")
+
+#One-hot encode numeric traits
+tmp <- pData(dat.filtered)[,c("genotype", "sex", "age", "CellType", "batch", "cluster")]
+tmp <- tmp %>%
+  mutate(condition = paste(age, genotype, CellType))
+dmy <- dummyVars("~.", data = tmp)
+projection_cor_meta <- data.frame(predict(dmy, newdata = tmp))
+
+projection.cor <- cor(projection_cor_meta, t(projection$projection))
+projection.cor <- projection.cor[order.dendrogram(as.dendrogram(hclust(dist(projection.cor)))),order.dendrogram(as.dendrogram(hclust(dist(t(projection.cor)))))]
+#projection.cor <- projection.cor[,order.dendrogram(as.dendrogram(hclust(dist(t(projection.cor)))))]
+pmat.projection <- cor.mtest(cbind(projection_cor_meta, t(projection$projection)))
+pmat.projection <- pmat.projection$p
+rownames(pmat.projection) <- colnames(cbind(projection_cor_meta, t(projection$projection)))
+colnames(pmat.projection) <- colnames(cbind(projection_cor_meta, t(projection$projection)))
+pmat.projection <- pmat.projection[rownames(projection.cor), colnames(projection.cor)]
+cutoff <- .05
+colnames(projection.cor) <- str_replace(colnames(projection.cor), "Pattern_", "")
+rownames(projection.cor) <- str_to_title(str_replace_all(rownames(projection.cor), "_", " "))
+corrplot(projection.cor, tl.col = "black", tl.srt = 0, method = "color", addgrid.col = "grey20", p.mat = pmat.projection, sig.level = cutoff, insig = "blank", bg = "grey80",cl.align.text = "l", cl.ratio = 0.2, cl.offset = 0.2, cl.pos = "b")
+
+meta_cor <- cor(projection_cor_meta[, c("age", "sex", "genotype")])
+pmat.meta <- cor.mtest(projection_cor_meta[, c("age", "sex", "genotype")])
+pmat.meta <- pmat.meta$p
+rownames(pmat.meta) <- c("age", "sex", "genotype")
+colnames(pmat.meta) <- c("age", "sex", "genotype")
+
+corrplot(meta_cor, tl.col = "black", tl.srt = 0, method = "color", addgrid.col = "grey20", p.mat = pmat.meta, insig = "p-value", sig.level = 0)
+
+```
+
+```{r RF_classifier}
+model <- readRDS("../Linnarsson_enteric_data/RFmodel_subset.rds")
+
+test_dat <- t(projection70$projection)
+test_dat <- apply(test_dat, 2, function(x){ (x-mean(x))/sd(x)})
+
+pData(dat.filtered)$celltype_pred <- predict(model, newdata = test_dat)
+pData(dat.filtered)$celltype_pred_description <- NA
+pData(dat.filtered)[pData(dat.filtered)$celltype_pred %in% c("ENT4", "ENT5", "ENT6", "ENT9"), "celltype_pred_description"] <- "Cholinergic enteric neurons"
+pData(dat.filtered)[pData(dat.filtered)$celltype_pred %in% c("ENT1", "ENT2", "ENT3"), "celltype_pred_description"] <- "Nitrergic enteric neurons"
+pData(dat.filtered)[pData(dat.filtered)$celltype_pred %in% c("ENT7", "ENT8"), "celltype_pred_description"] <- "Cholinergic enteric neurons, VGLUT2"
+pData(dat.filtered)[pData(dat.filtered)$celltype_pred %in% c("ENTG1"), "celltype_pred_description"] <- "Enteric glia, proliferating"
+pData(dat.filtered)[is.na(pData(dat.filtered)$celltype_pred_description), "celltype_pred_description"] <- "Enteric glia"
+
+plotUMAP(dat.filtered, color = "celltype_pred_description") + 
+  theme(aspect.ratio = 1)
+
+pData(dat.filtered)$final_celltype <- pData(dat.filtered)$CellType
+pData(dat.filtered)$final_celltype <- as.character(pData(dat.filtered)$final_celltype)
+pData(dat.filtered)[pData(dat.filtered)$celltype_pred_description == "Nitrergic enteric neurons", "final_celltype"] <- "Nitrergic Neuron"
+pData(dat.filtered)$final_celltype <- as.factor(pData(dat.filtered)$final_celltype)
+plotUMAP(dat.filtered, color = "final_celltype")
+```

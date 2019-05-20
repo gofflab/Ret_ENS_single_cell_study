@@ -7,27 +7,6 @@ output: pdf_document
 ```{r include=FALSE}
 knitr::opts_chunk$set(message=FALSE,warning=FALSE,error=FALSE,fig.align="center")
 source("init.R")
-
-#Heatmap helpers
-
-#writeLines(paste0('c("',paste(levels(pData(dat.filtered)$Cluster),brewer.pal(8, "Set1"),sep='" = "', collapse='", "'),'")'))
-#writeLines(paste0('c("',paste(levels(pData(dat.filtered)$CellType),brewer.pal(7, "Set1"),sep='" = "', collapse='", "'),'")'))
-#writeLines(paste0('c("',paste(levels(pData(dat.filtered)$genotype),brewer.pal(3, "Dark2")[1:2],sep='" = "', collapse='", "'),'")'))
-#writeLines(paste0('c("',paste(names(table(pData(dat.filtered)$age)),brewer.pal(5, "Dark2")[4:5],sep='" = "', collapse='", "'),'")'))
-
-#heatmap_colors<-list(
-#"Cell Type" =  c("Acetylcholinergic Neuron" = "#7FC97F", "Ambiguous" = "#BEAED4", "Neuron" = "#FDC086", "Noradrenergic Neuron" = "#FFFF99", "Progenitor/Glia" = "#386CB0", "Unknown" = "#F0027F", "Transition Cell" = "#BF5B17"),
-#"Genotype" = c("het" = "#7FC97F", "hom" = "#BEAED4"),
-#"Genotype" = c("het" = "#1B9E77", "hom" = "#D95F02"),
-#"Sex" = c("female"="black","male"="gray70"),
-#"Cluster" = c("1" = "#E41A1C", "2" = "#377EB8", "3" = "#4DAF4A", "4" = "#984EA3", "5" = "#FF7F00", "6" = "#FFFF33", "7" = "#A65628", "8" = "#F781BF"),
-#"Age" = c("E12.5" = "#E7298A", "E14.5" = "#66A61E"))
-
-#myLower <- 0
-#myUpper <- 2.8
-
-#heatmap_data[heatmap_data<myLower]<-myLower
-#heatmap_data[heatmap_data > myUpper] <- myUpper
 ```
 
 # Differential gene expression testing
@@ -650,13 +629,4 @@ ggplot(pData(vagal_dat.filtered.expressed.normalized), aes(x = UMAP1, y = UMAP2,
   scale_color_brewer(palette = "Set1") +
   theme_classic() +
   ggtitle("Umap on 500 genes DE wrt cluster")
-```
-
-```{r pseudotime}
-pseudotime_genotype_DE <- differentialGeneTest(dat.filtered[expressed_genes,], fullModelFormulaStr = "~sm.ns(Pseudotime, df=3)*genotype + batch",
-  reducedModelFormulaStr = "~sm.ns(Pseudotime, df=3) + genotype + batch")
-
-pseudotime_genotype_DE_sorted <- pseudotime_DE[order(pseudotime_genotype_DE$pval),]
-
-pseudotime_genotype_sigGenes <- pseudotime_genotype_DE_sorted[pseudotime_genotype_DE_sorted$qval < 1e-4,"gene_id"]
 ```

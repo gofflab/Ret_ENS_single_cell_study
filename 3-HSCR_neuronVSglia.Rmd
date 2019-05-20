@@ -22,8 +22,8 @@ source('init.R')
 #################
 
 ```{r neuron_gene_selection}
-dat.neurons <- vagal_dat.filtered[,pData(vagal_dat.filtered)$CellType %in% c("Neuron","Noradrenergic Neuron","Acetylcholinergic Neuron","Transition Cell")]
-# 396 cells
+dat.neurons <- dat.filtered[,pData(dat.filtered)$CellType %in% c("Neuron","Noradrenergic Neuron","Acetylcholinergic Neuron","Transition Cell") & !pData(dat.filtered)$cluster == 8]
+# 385 cells
 
 dat.neurons@dim_reduce_type <- "DDRTree"
 dat.neurons@auxOrderingData <- new.env()
@@ -40,7 +40,7 @@ fData(dat.neurons)$percent_detection <-
 
 neuron_expressed_genes <- rownames(fData(dat.neurons)[fData(dat.neurons)$num_cells_expressed > 20 &fData(dat.neurons)$sd_expr > .Machine$double.eps,])
 #Expressed in at least 20 cells (5%) at > 0 CPC with SD > 0
-#11,955 genes
+#11,892 genes
 ```
 
 # Normalization by sequencing depth
@@ -891,15 +891,16 @@ glia_genotype_diff_test_sigGenes <- rownames(glia_genotype_diff_test_sorted[glia
 #heatmap_annotation <- pData(dat.glia)[, c("CellType", "genotype", "sex", "cluster")]
 heatmap_annotation <- merge(pData(dat.glia)[, c("CellType", "genotype", "sex")], pData(dat.filtered)[,"cluster", drop = F], by = 0)
 rownames(heatmap_annotation) <- heatmap_annotation[,1]
+heatmap_annotation <- heatmap_annotation[,-1]
 
 heatmap_colors <- list(
 "Cell Type" =  c("Progenitor/Glia" = "#984EA3", "Transition Cell" = "#FF7F00"),
 "Genotype" = c("het" = "#E41A1C", "hom" = "#377EB8"),
 "Sex" = c("female"="black","male"="#999999"),
-"Cluster" = c("1" = "#E41A1C", "2" = "#377EB8", "3" = "#4DAF4A", "4" = "#984EA3", "5" = "#FF7F00", "6" = "#FFFF33", "7" = "#A65628", "8" = "#F781BF", "9" = "#999999", "10" = "#E41A1C", "11" = "#377EB8")
+"Cluster" = c("1" = "#E41A1C", "2" = "#596A98", "3" = "#449B75", "4" = "#6B886D", "5" = "#AC5782", "6" = "#FF7F00", "7" = "#FFE528", "8" = "#C9992C", "9" = "#C66764", "10" = "#E485B7", "11" = "#999999")
 )
 
-#writeLines(paste0('c("',paste(levels(pData(dat.filtered)$cluster),brewer.pal(9, "Set1"),sep='" = "', collapse='", "'),'")'))
+writeLines(paste0('c("',paste(levels(pData(dat.filtered)$cluster),colorRampPalette(brewer.pal(9, "Set1"))(11),sep='" = "', collapse='", "'),'")'))
 
 
 colnames(heatmap_annotation) <- c("Cell Type","Genotype","Sex","Cluster")
@@ -916,6 +917,7 @@ heatmap_data <- log(tmp -min(tmp) + 1)
 rownames(heatmap_data) <- lookupGeneName(dat.glia, rownames(heatmap_data))
 
 #pdf("Heatmap_glia_wrt_genotype.pdf",height=36,width=17)
+pdf("posterFig_Heatmap_glia_wrt_genotype.pdf",height=36,width=17)
 pheatmap(mat = heatmap_data,
          scale = "none",
          show_rownames = TRUE,
@@ -930,7 +932,7 @@ pheatmap(mat = heatmap_data,
          fontsize = 8#,
          #main = "Neurons\n84 Genes, 1% FDR\nFull model: ~ genotype + CellType + sex + batch\nReduced model: ~ CellType + sex + batch"
          )
-#dev.off()
+dev.off()
 ```
 
 ```{r GOenrichment}
@@ -1025,6 +1027,53 @@ pheatmap(mat = heatmap_data,
          color = colorRampPalette(rev(brewer.pal(n = 11, name = "RdYlBu")))(100),
 #         color = colorRampPalette(c("blue","white","red"))(100),
          breaks=seq(myLower,myUpper,length=100),
+         annotation_col=heatmap_annotation,
+         annotation_colors=heatmap_colors,
+         annotation_names_col=TRUE,
+         annotation_legend=TRUE,
+         border_color = NA
+         )
+dev.off()
+```
+
+```{r glia_DE_wrt_genotype*cluster}
+glia_genotype_cluster_diff_test <- differentialGeneTest(dat.glia[glia_expressed_genes, pData(dat.glia)$cluster %in% c(1, 2, 5, 6, 8, 10)], fullModelFormulaStr = "~genotype*cluster + sex + batch + CellType", reducedModelFormulaStr = "~genotype + sex + cluster + batch + CellType", verbose = T)
+
+glia_genotype_cluster_diff_test_sorted <- glia_genotype_cluster_diff_test[order(glia_genotype_cluster_diff_test$qval),]
+
+glia_genotype_cluster_diff_test_sigGenes <- rownames(glia_genotype_cluster_diff_test_sorted[glia_genotype_cluster_diff_test_sorted$qval <= 0.01,])
+
+heatmap_annotation <- pData(dat.glia)[, c("CellType", "genotype", "sex", "cluster")]
+
+heatmap_colors <- list(
+"Cell Type" =  c("Progenitor/Glia" = "#984EA3", "Transition Cell" = "#FF7F00"),
+"Genotype" = c("het" = "#E41A1C", "hom" = "#377EB8"),
+"Sex" = c("female"="black","male"="#999999"),
+"Cluster" = c("1" = "#E41A1C", "2" = "#596A98", "3" = "#449B75", "4" = "#6B886D", "5" = "#AC5782", "6" = "#FF7F00", "7" = "#FFE528", "8" = "#C9992C", "9" = "#C66764", "10" = "#E485B7", "11" = "#999999")
+)
+
+colnames(heatmap_annotation) <- c("Cell Type","Genotype","Sex","Cluster")
+heatmap_annotation <- heatmap_annotation %>%
+  select("Cluster","Genotype","Sex","Cell Type")
+
+tmp<-t(scale(t(exprs(dat.glia[glia_genotype_cluster_diff_test_sigGenes,])),scale=T,center=T))
+heatmap_data<-log(tmp -min(tmp) + 1)
+#heatmap_data<-tmp -min(tmp)
+#myLower<-(0)
+#myUpper<-(3)
+#heatmap_data[heatmap_data<myLower]<-myLower
+#heatmap_data[heatmap_data>myUpper]<-myUpper
+rownames(heatmap_data)<-lookupGeneName(dat.glia,rownames(heatmap_data))
+
+pdf("posterFig_Heatmap_glia_wrt_genotype_cluster.pdf",height=36,width=15)
+pheatmap(mat = heatmap_data,
+         scale="none",
+         show_rownames=TRUE,
+         show_colnames=FALSE,
+         drop_levels=FALSE,
+         color = colorRampPalette(rev(brewer.pal(n = 11, name = "RdYlBu")))(100),
+#         color = colorRampPalette(c("blue","white","red"))(100),
+#         breaks=seq(myLower,myUpper,length=100),
          annotation_col=heatmap_annotation,
          annotation_colors=heatmap_colors,
          annotation_names_col=TRUE,

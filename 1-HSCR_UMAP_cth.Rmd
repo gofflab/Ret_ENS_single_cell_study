@@ -4,8 +4,8 @@ author: "Liz Vincent"
 date: "`r format(Sys.time(), '%B %d, %Y')`"
 output: pdf_document
 ---
-```{r init,include=F}
-knitr::opts_chunk$set(message=FALSE,warning=FALSE,error=FALSE)
+```{r init, include = F}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, error = FALSE)
 #setwd("/Users/liz/Documents/Goff Lab/Chakravarti/Chakravarti_HD")
 
 source('init.R')
@@ -16,10 +16,10 @@ expressed_genes <- readRDS("expressed_genes.rds")
 
 ## Determine Overdispersed Genes and Run PCA on Overdispersed Genes
 Subset the uncorrected Cell Data Set by batch to determine overdispersed genes within each batch and take the insection of genes overdispersed in both batches.
-```{r subset_by_batch,include=F}
-dat.batch1<-dat.filtered[,pData(dat.filtered)$batch == "HD01"]
-dat.batch1<-estimateSizeFactors(dat.batch1)
-dat.batch1<-estimateDispersions(dat.batch1,cores=detectCores()-1)
+```{r subset_by_batch, include = F}
+dat.batch1 <- dat.filtered[, pData(dat.filtered)$batch == "HD01"]
+dat.batch1 <- estimateSizeFactors(dat.batch1)
+dat.batch1 <- estimateDispersions(dat.batch1, cores = detectCores()-1)
 disp_table.batch1 <- dispersionTable(dat.batch1)
 disp_table.batch1$gene_id<-as.character(disp_table.batch1$gene_id)
 unsup_clustering_genes.batch1 <- disp_table.batch1[disp_table.batch1$dispersion_empirical >= 1.5*(disp_table.batch1$dispersion_fit),'gene_id']
@@ -259,34 +259,28 @@ ggplot(pData(dat.filtered.expressed.normalized), aes(x = UMAP1, y = UMAP2, color
   theme_classic()
 
 pData(dat.filtered)$cluster <- as.factor(m$classification)
+
+plotUMAP(dat.filtered, color = "cluster")
+
+levels(pData(dat.filtered)$cluster)[levels(pData(dat.filtered)$cluster)==9] <- 7
+levels(pData(dat.filtered)$cluster)[levels(pData(dat.filtered)$cluster)==5] <- 3
+levels(pData(dat.filtered)$cluster)[levels(pData(dat.filtered)$cluster)==6] <- 1
+
+levels(pData(dat.filtered)$cluster)[levels(pData(dat.filtered)$cluster)==7] <- 5
+levels(pData(dat.filtered)$cluster)[levels(pData(dat.filtered)$cluster)==8] <- 6
+levels(pData(dat.filtered)$cluster)[levels(pData(dat.filtered)$cluster)==10] <- 7
+levels(pData(dat.filtered)$cluster)[levels(pData(dat.filtered)$cluster)==11] <- 8
+
+plotUMAP(dat.filtered, color = "cluster")
+
+pData(dat.filtered.expressed.normalized)$cluster <- pData(dat.filtered)$cluster
 ```
 
 ## Build the Cell Type Hierarchy
 ```{r}
-#cth<-addCellType(cth,"Neuroendocrine Cell",classify_func=function(x){ x[lookupGeneId(dat.filtered.expressed.normalized,"Cck"),] > 90 | x[lookupGeneId(dat.filtered.expressed.normalized,"Grp"),] > 90 | x[lookupGeneId(dat.filtered.expressed.normalized,"Dll3"),] > 8 })
-#Ascl1, Cck, Chga, Syp, Grp, Dll3, Rtn1
-
-# Nos1/Vip - inhibitory muscle motor neurons
-
-#Neuropeptide Y neurons:
-#Npy, Npy1r, Npy2r
-
-#Substance P neurons:
-#Tac1
-
-#Serotenergic
-#Slc6a4, Htr1b, Htr2a, Htr2b, Htr3a, Htr4, Htr3b, 
-
-#cth<-addCellType(cth,"Descending Interneurons (myenteric; migrating myoelectric complex)",classify_func=function(x){ x[lookupGeneId(dat.filtered.expressed.normalized,"Cck"),] == 0 | x[lookupGeneId(dat.filtered.expressed.normalized,"Sst"),] > 0 | x[lookupGeneId(dat.filtered.expressed.normalized,"Slc18a3"),] > 0})
-
 cth<-newCellTypeHierarchy() 
 
 cth<-addCellType(cth,"Neuron",classify_func=function(x){ x[lookupGeneId(dat.filtered.expressed.normalized,"Snap25"),] > 50 | x[lookupGeneId(dat.filtered.expressed.normalized,"Nefl"),] > 90 | x[lookupGeneId(dat.filtered.expressed.normalized,"Rtn1"),] > 50 | x[lookupGeneId(dat.filtered.expressed.normalized,"Vip"),] > 60 | x[lookupGeneId(dat.filtered.expressed.normalized,"Tubb3"),] > 160 | x[lookupGeneId(dat.filtered.expressed.normalized,"Nefh"),] > 1 | x[lookupGeneId(dat.filtered.expressed.normalized,"Elavl3"),] > 6 | x[lookupGeneId(dat.filtered.expressed.normalized,"Elavl4"),] > 200 })
-
-#Nos1, Cartpt, Gal, Ass1 = NITRERGIC neurons!
-#Also Moxd1, Tmem255b, Cox8b, Anxa11
-#Gpx3 expressed highly in tip of cluster 9
-#Pattern 10 is proliferating glia
 
 cth<-addCellType(cth,"Noradrenergic Neuron",parent_cell_type_name = "Neuron",classify_func=function(x){ x[lookupGeneId(dat.filtered.expressed.normalized,"Isl1"),] > 10 & x[lookupGeneId(dat.filtered.expressed.normalized,"Dbh"),] > 40})
 
@@ -296,27 +290,29 @@ cth<-addCellType(cth,"Progenitor/Glia",classify_func=function(x){ x[lookupGeneId
 
 dat.filtered.expressed.normalized <- classifyCells(dat.filtered.expressed.normalized, cth, method = "markers-only")
 
-ggplot(pData(dat.filtered.expressed.normalized), aes(x = UMAP1, y = UMAP2, color = CellType)) +
+pData(dat.filtered)$CellType <- pData(dat.filtered.expressed.normalized)$CellType
+
+ggplot(pData(dat.filtered), aes(x = UMAP1, y = UMAP2, color = CellType)) +
   geom_point() +
   scale_color_manual(values = c("#E41A1C", "#F781BF", "#377EB8", "#4DAF4A", "#984EA3", "#999999")) +
   theme_bw() +
   ggtitle("Umap on 419 genes post-normalization\nAnnotation based on normalized expression values only")
 
-pData(dat.filtered.expressed.normalized)[pData(dat.filtered.expressed.normalized)$cluster == 11, "CellType"] <- "Noradrenergic Neuron"
-pData(dat.filtered.expressed.normalized)[pData(dat.filtered.expressed.normalized)$cluster == 4 & pData(dat.filtered.expressed.normalized)$CellType %in% c("Unknown", "Ambiguous"), "CellType"] <- "Neuron"
+pData(dat.filtered)[pData(dat.filtered)$cluster == 8, "CellType"] <- "Noradrenergic Neuron"
+pData(dat.filtered)[pData(dat.filtered)$cluster == 4 & pData(dat.filtered)$CellType %in% c("Unknown", "Ambiguous"), "CellType"] <- "Neuron"
 
-pData(dat.filtered.expressed.normalized)[pData(dat.filtered.expressed.normalized)$cluster %in% c(1, 5, 6, 10) & pData(dat.filtered.expressed.normalized)$CellType %in% c("Unknown", "Ambiguous"), "CellType"] <- "Progenitor/Glia"
+pData(dat.filtered)[pData(dat.filtered)$cluster %in% c(1, 3, 7) & pData(dat.filtered)$CellType %in% c("Unknown", "Ambiguous"), "CellType"] <- "Progenitor/Glia"
 
-levels(pData(dat.filtered.expressed.normalized)$CellType) <- c(levels(pData(dat.filtered.expressed.normalized)$CellType), "Transition Cell")
-pData(dat.filtered.expressed.normalized)[pData(dat.filtered.expressed.normalized)$CellType%in% c("Unknown", "Ambiguous"), "CellType"] <- "Transition Cell"
+levels(pData(dat.filtered)$CellType) <- c(levels(pData(dat.filtered)$CellType), "Transition Cell")
+pData(dat.filtered)[pData(dat.filtered)$CellType%in% c("Unknown", "Ambiguous"), "CellType"] <- "Transition Cell"
 
-ggplot(pData(dat.filtered.expressed.normalized), aes(x = UMAP1, y = UMAP2, color = CellType)) +
+ggplot(pData(dat.filtered), aes(x = UMAP1, y = UMAP2, color = CellType)) +
   geom_point() +
   scale_color_brewer(palette = "Set1") +
   theme_classic() +
   ggtitle("Umap on 419 genes post-normalization\nAnnotation post-imputation")
 
-pData(dat.filtered)$CellType <- pData(dat.filtered.expressed.normalized)$CellType
+pData(dat.filtered.expressed.normalized)$CellType <- pData(dat.filtered)$CellType
 
 tmp_df <- pData(dat.filtered) %>%
   mutate(condition = paste(age, genotype, sex)) %>% dplyr::select(condition, CellType) %>% table(.) %>% as.data.frame(.) %>% dcast(formula = condition ~ CellType)
@@ -327,74 +323,20 @@ tmp_df <- tmp_df[,c(-1, -3, -7)]
 
 tmp_df <- as.data.frame(apply(tmp_df, 1, function(x){x/sum(x)}))
 
-tmp_df$condition <- rownames(tmp_df)
+tmp_df$CellType <- rownames(tmp_df)
 
 tmp_df <- melt(tmp_df)
 
-labels <- tmp_df$variable
+labels <- unique(tmp_df$variable)
 labels <- str_replace_all(labels, " ", "\n")
 
-
 ggplot(tmp_df) + 
-  geom_col(aes(x = variable, y = value, fill = condition), width = 0.7, position = "dodge") +
+  geom_col(aes(x = variable, y = value, fill = CellType), width = 0.7, position = "dodge") +
   scale_fill_brewer("Cell Type", palette = "Set1") + 
   scale_y_continuous("Proportion", expand = c(0,0)) + 
   scale_x_discrete(labels = labels) +
   theme(legend.position = c(0.66, 0.86), axis.title.x = element_blank())
 ```
-
-## DDRTree
-```{r}
-# DDRTree max components akin to # of endpoints you think you might have (e.g. 5 or 6 for this data)
-dat.filtered.expressed.normalized <- reduceDimension(dat.filtered.expressed.normalized, max_components = 10, reduction_method = "DDRTree", norm_method = "log", residualModelFormulaStr = "~batch", maxIter = 2000, tol = 1e-7)
-dat.filtered.expressed.normalized <- orderCells(dat.filtered.expressed.normalized)
-
-ggplot(pData(dat.filtered.expressed.normalized), aes(x = UMAP1, y = UMAP2, color = State)) +
-  geom_point(size = 1) +
-#  scale_color_brewer(palette = "Set1") +
-  theme_classic() +
-  ggtitle("Umap on 419 genes post-normalization")
-
-plot_complex_cell_trajectory(dat.filtered.expressed.normalized, color_by = "State") # + scale_color_brewer(palette = "Set1")
-
-dat.filtered.expressed.normalized <- orderCells(dat.filtered.expressed.normalized, root_state = 5)
-
-plot_complex_cell_trajectory(dat.filtered.expressed.normalized, color_by = "CellType") +
-  scale_color_brewer(palette = "Set1") + 
-  guides(col = guide_legend(nrow = 2))
-```
-
-```{r remove_sacral_pop}
-vagal_dat.filtered.expressed.normalized <- dat.filtered.expressed.normalized[, !(pData(dat.filtered.expressed.normalized)$cluster == 11)]
-
-vagal_dat.filtered <- dat.filtered[,rownames(pData(vagal_dat.filtered.expressed.normalized))]
-```
-
-
-# Population markers:
-
-Mitotic glial progenitors:
-*Ube2c/Kpna2/Top2a/Pbk/Prc1/Tacc3/Aurka/Aurkb/Cdc20/Hist1h2ao/Ccna2/Hmgb2
-
-Other population markers:
-*Gal/Ass1/Cldn5/Gm5424
-*Cck/St18: transcription factor (repressor)
-*Prph: neuonal cytoskeleton protein in PNS/A730017C20Rik/Mapt: encodes tao protein, very important in nervous system/Syn2/Sncg:found primarily in the peripheral nervous system (in primary sensory neurons, sympathetic neurons, and motor neurons)/Ecel1
-*Pcp4: purkinje cell protein, plays role in synaptic plasticity/Ddc
-*Myl9/Cnn2: may function in the structural organization of actin filaments. The encoded protein could play a role in smooth muscle contraction and cell adhesion/Anxa2: functions as an autocrine factor which heightens osteoclast formation and bone resorption/Col3a1: involved in connective tissue/Postn: support adhesion and migration of epithelial cells/Mmp2:major structural component of basement membranes/Gpr17: highly expressed in precursors to mature oligodendrocytes but not expressed in mature oligodendrocytes
-*Hes1
-*Myl1
-
-Neuroendocrine-specific protein
-*I cells secrete Cck
-*G cells release gastrin and stimulate gastric acid secretion (cells do not express Gast but do express Grp, which stimulates release of gastrin)
-*N cells release Nts (maybe...a few cells express Nts)
-*D cells secrete Sst
-* Neuroendocrine genes: Cck, Nts, Sst, Vip, Grp, Rtn1
-*Ascl1 = neuroendocrine TF
-*Chga
-*Syp
-*Calca
 
 ```{r,include=F,eval=F}
 saveRDS(dat.filtered,file="datfiltered_postCTH.rds")

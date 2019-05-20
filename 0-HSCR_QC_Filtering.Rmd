@@ -5,7 +5,7 @@ date: "`r format(Sys.time(), '%B %d, %Y')`"
 output: pdf_document
 ---
 ```{r include=FALSE}
-knitr::opts_chunk$set(message=FALSE,warning=FALSE,error=FALSE,fig.align="center")
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, error = FALSE, fig.align = "center")
 source("init.R")
 ```
 
@@ -13,128 +13,128 @@ source("init.R")
 ### Data from Cuffnorm run on all cells
 ```{r Import_Data, results='hide'}
 # Gene FPKMs
-fpkms<-read.delim("all_cells/genes.fpkm_table",row.names=1,stringsAsFactors = F)
-colnames(fpkms)<-unlist(strsplit(as.character(colnames(fpkms)),"_0$")) # Remove "_0" after cell ids
+fpkms <- read.delim("all_cells/genes.fpkm_table", row.names = 1, stringsAsFactors = F)
+colnames(fpkms) <- unlist(strsplit(as.character(colnames(fpkms)), "_0$")) # Remove "_0" after cell ids
 
 # Isoform FPKMs
-isoform_fpkms<-read.delim("all_cells/isoforms.fpkm_table",row.names=1,stringsAsFactors = F)
-colnames(isoform_fpkms)<-unlist(strsplit(as.character(colnames(isoform_fpkms)),"_0$")) # Remove "_0" after cell ids
+isoform_fpkms <- read.delim("all_cells/isoforms.fpkm_table", row.names = 1, stringsAsFactors = F)
+colnames(isoform_fpkms) <- unlist(strsplit(as.character(colnames(isoform_fpkms)), "_0$")) # Remove "_0" after cell ids
 
 # Sample Annotation
-sample_ann<-read.delim("all_cells/samples.table",stringsAsFactors = F)
-sample_ann<-sample_ann[,c(-2,-5)] # Remove file path and external scale (external scale = 1 for all cells)
-names(sample_ann)<-c("cell_id",names(sample_ann)[2:3]) # Rename sample_id column as cell_id
-sample_ann$cell_id<-unlist(strsplit(as.character(sample_ann$cell_id),"_0$")) # Remove "_0" after cell ids
+sample_ann <- read.delim("all_cells/samples.table", stringsAsFactors = F)
+sample_ann <- sample_ann[, c(-2, -5)] # Remove file path and external scale (external scale = 1 for all cells)
+names(sample_ann) <- c("cell_id", names(sample_ann)[2:3]) # Rename sample_id column as cell_id
+sample_ann$cell_id <- unlist(strsplit(as.character(sample_ann$cell_id), "_0$")) # Remove "_0" after cell ids
 
-master_cell_sheet<-read.delim("sample_info.txt",stringsAsFactors=F,row.names=1)
-sample_info<-merge(sample_ann,master_cell_sheet,by="cell_id")
-alignment_rates<-read.delim("reads.txt",stringsAsFactors = F)
-alignment_rates$unmapped_reads<-alignment_rates$unmapped_mates/2
-sample_info<-merge(sample_info,alignment_rates,by="cell_id")
-rownames(sample_info)<-sample_info[,1] # Set row names to cell_ids
+master_cell_sheet <- read.delim("sample_info.txt", stringsAsFactors = F, row.names = 1)
+sample_info <- merge(sample_ann, master_cell_sheet, by = "cell_id")
+alignment_rates <- read.delim("reads.txt", stringsAsFactors = F)
+alignment_rates$unmapped_reads <- alignment_rates$unmapped_mates/2
+sample_info <- merge(sample_info, alignment_rates, by = "cell_id")
+rownames(sample_info) <- sample_info[, 1] # Set row names to cell_ids
 
 # Gene Annotation
-gene_ann<-read.delim("all_cells/genes.attr_table",row.names=1,stringsAsFactors = F)
+gene_ann <- read.delim("all_cells/genes.attr_table", row.names = 1, stringsAsFactors = F)
 
-fd<-new("AnnotatedDataFrame",data=gene_ann)
-pd<-new("AnnotatedDataFrame",data=sample_info)
+fd <- new("AnnotatedDataFrame", data = gene_ann)
+pd <- new("AnnotatedDataFrame", data = sample_info)
 
 # Create cell data set object
-dat.relative <- newCellDataSet(cellData=as.matrix(fpkms),
-                      phenoData=pd,
-                      featureData=fd)
+dat.relative <- newCellDataSet(cellData = as.matrix(fpkms),
+                      phenoData = pd,
+                      featureData = fd)
 ```
 
 # Remove Outliers
 ### Remove cells with low alignment rates
 Cells with total reads in the bottom 5% and an alignment rate below 50% were removed (**Figure 1**).
 ```{r}
-n<-floor(nrow(pData(dat.relative)) * 0.05)  # 5% of 1369 cells = 68.45 cells, round down to 68
-read_min<-(pData(dat.relative)[order(pData(dat.relative)$total_reads),"total_reads"])[n]  # 5% of cells have < 21810 total reads
+n <- floor(nrow(pData(dat.relative)) * 0.05)  # 5% of 1369 cells = 68.45 cells, round down to 68
+read_min <- (pData(dat.relative)[order(pData(dat.relative)$total_reads),"total_reads"])[n]  # 5% of cells have < 21810 total reads
 ```
 
 ```{r include = F}
 pdf("Figure 1a.pdf")
 
 ggplot(pData(dat.relative)) + 
-  geom_point(aes(x=log10(total_reads),y=alignment_percentage, col = ifelse(pData(dat.relative)$total_reads < read_min & pData(dat.relative)$alignment_percentage <50, "Removed", "Kept"))) +
-  geom_vline(xintercept = log10(read_min), lty="dashed") +
-  geom_hline(yintercept = 50, lty="dashed") +
-  labs(x = "Log10(Total Number of Reads)", y="% Reads Aligned", col = "Status") +
+  geom_point(aes(x=log10(total_reads),y=alignment_percentage, col = ifelse(pData(dat.relative)$total_reads < read_min & pData(dat.relative)$alignment_percentage < 50, "Removed", "Kept"))) +
+  geom_vline(xintercept = log10(read_min), lty = "dashed") +
+  geom_hline(yintercept = 50, lty = "dashed") +
+  labs(x = "Log10(Total Number of Reads)", y = "% Reads Aligned", col = "Status") +
   scale_color_manual(values = c("black", "red"))
 
 dev.off()
 
-p1<-pData(dat.relative) %>%
-  mutate(group=paste(age, sex, genotype)) %>%
+p1 <- pData(dat.relative) %>%
+  mutate(group = paste(age, sex, genotype)) %>%
   ggplot(.) + 
-  geom_point(aes(x=total_reads,y=alignment_percentage,col=group)) +
-  stat_ellipse(aes(x=total_reads, y=alignment_percentage,col=group),type = "norm") +
-  labs(x = "Total Number of Reads",y="% Reads Aligned",color="Group")
+  geom_point(aes(x = total_reads, y = alignment_percentage, col = group)) +
+  stat_ellipse(aes(x = total_reads, y = alignment_percentage, col = group), type = "norm") +
+  labs(x = "Total Number of Reads", y = "% Reads Aligned", color = "Group")
 
-p2<-ggplot(pData(dat.relative)) + 
-  geom_point(aes(x=total_reads,y=alignment_percentage,col=genotype)) +
-  stat_ellipse(aes(x=total_reads, y=alignment_percentage,col=genotype),type = "norm") +
-  labs(x = "Total Number of Reads",y="% Reads Aligned",color="Genotype") +
+p2 <- ggplot(pData(dat.relative)) + 
+  geom_point(aes(x = total_reads, y = alignment_percentage, col = genotype)) +
+  stat_ellipse(aes(x = total_reads, y = alignment_percentage, col = genotype), type = "norm") +
+  labs(x = "Total Number of Reads", y = "% Reads Aligned", color = "Genotype") +
   scale_color_brewer(palette = "Set1")
 
-p3<-ggplot(pData(dat.relative)) + 
-  geom_point(aes(x=total_reads,y=alignment_percentage,col=sex)) +
-  stat_ellipse(aes(x=total_reads, y=alignment_percentage,col=sex),type = "norm") +
-  labs(x = "Total Number of Reads",y="% Reads Aligned",color="Sex") +
+p3 <- ggplot(pData(dat.relative)) + 
+  geom_point(aes(x = total_reads, y = alignment_percentage, col = sex)) +
+  stat_ellipse(aes(x = total_reads, y = alignment_percentage, col = sex), type = "norm") +
+  labs(x = "Total Number of Reads", y = "% Reads Aligned", color = "Sex") +
   scale_color_brewer(palette = "Set1")
 
-p4<-ggplot(pData(dat.relative)) + 
-  geom_point(aes(x=total_reads,y=alignment_percentage,col=age)) +
-  stat_ellipse(aes(x=total_reads, y=alignment_percentage,col=age),type = "norm") +
-  labs(x = "Total Number of Reads",y="% Reads Aligned",color="Age") +
+p4 <- ggplot(pData(dat.relative)) + 
+  geom_point(aes(x = total_reads, y = alignment_percentage, col = age)) +
+  stat_ellipse(aes(x = total_reads, y = alignment_percentage, col = age), type = "norm") +
+  labs(x = "Total Number of Reads", y = "% Reads Aligned", color = "Age") +
   scale_color_brewer(palette = "Set1")
 
-p5<-ggplot(pData(dat.relative)) + 
-  geom_point(aes(x=total_reads,y=alignment_percentage,col=batch)) +
-  stat_ellipse(aes(x=total_reads, y=alignment_percentage,col=batch),type = "norm") +
-  labs(x = "Total Number of Reads",y="% Reads Aligned",color="Batch") +
+p5 <- ggplot(pData(dat.relative)) + 
+  geom_point(aes(x = total_reads, y = alignment_percentage, col = batch)) +
+  stat_ellipse(aes(x = total_reads, y = alignment_percentage, col = batch), type = "norm") +
+  labs(x = "Total Number of Reads", y = "% Reads Aligned", color = "Batch") +
   scale_color_brewer(palette = "Set1")
 
-p6<-ggplot(pData(dat.relative)) + 
-  geom_point(aes(x=total_reads,y=alignment_percentage,col=split_plate)) +
-  stat_ellipse(aes(x=total_reads, y=alignment_percentage,col=split_plate),type = "norm") +
-  labs(x = "Total Number of Reads",y="% Reads Aligned",color="Rearrayed Plate")
+p6 <- ggplot(pData(dat.relative)) + 
+  geom_point(aes(x = total_reads, y = alignment_percentage, col = split_plate)) +
+  stat_ellipse(aes(x = total_reads, y = alignment_percentage, col = split_plate), type = "norm") +
+  labs(x = "Total Number of Reads", y = "% Reads Aligned", color = "Rearrayed Plate")
 
-legend<-unique(pData(dat.relative)[,c("source_plate","age","sex","genotype")] %>%
-       mutate(group=paste(source_plate,age,sex,genotype)))
+legend <- unique(pData(dat.relative)[, c("source_plate", "age", "sex", "genotype")] %>%
+       mutate(group = paste(source_plate, age, sex, genotype)))
 
-p7<-ggplot(pData(dat.relative)) + 
-  geom_point(aes(x=total_reads,y=alignment_percentage,col=source_plate)) +
-  stat_ellipse(aes(x=total_reads, y=alignment_percentage,col=source_plate),type = "norm") +
-  labs(x = "Total Number of Reads",y="% Reads Aligned",color="Embryo") +
-  scale_color_discrete(breaks=legend$source_plate,
-                       labels=legend$group)
+p7 <- ggplot(pData(dat.relative)) + 
+  geom_point(aes(x = total_reads, y = alignment_percentage, col = source_plate)) +
+  stat_ellipse(aes(x = total_reads, y = alignment_percentage, col = source_plate), type = "norm") +
+  labs(x = "Total Number of Reads", y = "% Reads Aligned", color = "Embryo") +
+  scale_color_discrete(breaks = legend$source_plate,
+                       labels = legend$group)
 
-p8<-ggplot(pData(dat.relative)) + 
-  geom_point(aes(x=total_reads,y=alignment_percentage,col=index_set)) +
-  stat_ellipse(aes(x=total_reads, y=alignment_percentage,col=index_set),type = "norm") +
-  labs(x = "Total Number of Reads",y="% Reads Aligned",color="Index Set")
+p8 <- ggplot(pData(dat.relative)) + 
+  geom_point(aes(x = total_reads, y = alignment_percentage, col = index_set)) +
+  stat_ellipse(aes(x = total_reads, y = alignment_percentage, col = index_set), type = "norm") +
+  labs(x = "Total Number of Reads", y = "% Reads Aligned", color = "Index Set")
  
-p9<-ggplot(pData(dat.relative)) + 
-  geom_point(aes(x=total_reads,y=alignment_percentage,col=index_1)) +
-  stat_ellipse(aes(x=total_reads, y=alignment_percentage,col=index_1),type = "norm") +
-  labs(x = "Total Number of Reads",y="% Reads Aligned",color="Column Index")
+p9 <- ggplot(pData(dat.relative)) + 
+  geom_point(aes(x = total_reads, y = alignment_percentage, col = index_1)) +
+  stat_ellipse(aes(x = total_reads, y = alignment_percentage, col = index_1), type = "norm") +
+  labs(x = "Total Number of Reads", y = "% Reads Aligned", color = "Column Index")
   
-p10<-ggplot(pData(dat.relative)) + 
-  geom_point(aes(x=total_reads,y=alignment_percentage,col=index_2)) +
-  stat_ellipse(aes(x=total_reads, y=alignment_percentage,col=index_2),type = "norm") +
-  labs(x = "Total Number of Reads",y="% Reads Aligned",color="Row Index")
+p10 <- ggplot(pData(dat.relative)) + 
+  geom_point(aes(x = total_reads, y = alignment_percentage, col = index_2)) +
+  stat_ellipse(aes(x = total_reads, y = alignment_percentage, col = index_2), type = "norm") +
+  labs(x = "Total Number of Reads", y = "% Reads Aligned", color = "Row Index")
 
-p11<-ggplot(pData(dat.relative)) + 
-  geom_point(aes(x=total_reads,y=alignment_percentage,col=factor(num_cells))) +
-  stat_ellipse(aes(x=total_reads, y=alignment_percentage,col=factor(num_cells)),type = "norm") +
-  labs(x = "Total Number of Reads",y="% Reads Aligned",color="Number of Cells per Well")
+p11 <- ggplot(pData(dat.relative)) + 
+  geom_point(aes(x = total_reads, y = alignment_percentage, col = factor(num_cells))) +
+  stat_ellipse(aes(x = total_reads, y = alignment_percentage, col = factor(num_cells)), type = "norm") +
+  labs(x = "Total Number of Reads", y = "% Reads Aligned", color = "Number of Cells per Well")
 
-p12<-ggplot(pData(dat.relative)) + 
-  geom_point(aes(x=total_reads,y=alignment_percentage,col=factor(sort_date))) +
-  stat_ellipse(aes(x=total_reads, y=alignment_percentage,col=factor(sort_date)),type = "norm") +
-  labs(x = "Total Number of Reads",y="% Reads Aligned",color="Sort Date")
+p12 <- ggplot(pData(dat.relative)) + 
+  geom_point(aes(x = total_reads, y = alignment_percentage, col = factor(sort_date))) +
+  stat_ellipse(aes(x = total_reads, y = alignment_percentage, col = factor(sort_date)), type = "norm") +
+  labs(x = "Total Number of Reads", y = "% Reads Aligned", color = "Sort Date")
 
 pdf("Figure 1b.pdf")
 
@@ -163,9 +163,9 @@ dev.off()
 pdf("Figure 1c.pdf")
 
 pData(dat.relative) %>%
-  mutate(group=paste(age, sex, genotype)) %>%
+  mutate(group = paste(age, sex, genotype)) %>%
   ggplot(.) + 
-  stat_density(aes(x=alignment_percentage), fill="gray70", color="gray60", alpha=0.3) +
+  stat_density(aes(x = alignment_percentage), fill = "gray70", color = "gray60", alpha = 0.3) +
   facet_wrap(~group) +
   scale_fill_brewer(palette = "Set1") +
   scale_color_brewer(palette = "Set1") +
@@ -177,9 +177,9 @@ dev.off()
 pdf("Figure 1d.pdf")
 
 pData(dat.relative) %>%
-  mutate(group=paste(age, sex, genotype)) %>%
+  mutate(group = paste(age, sex, genotype)) %>%
   ggplot(.) + 
-  stat_density(aes(x=total_reads), fill="gray70", color="gray60", alpha=0.3) +
+  stat_density(aes(x = total_reads), fill = "gray70", color = "gray60", alpha = 0.3) +
   facet_wrap(~group) +
   scale_fill_brewer(palette = "Set1") +
   scale_color_brewer(palette = "Set1") +
@@ -190,23 +190,23 @@ dev.off()
 ```
 
 ```{r}
-remove<-pData(dat.relative)[pData(dat.relative)$total_reads < read_min & pData(dat.relative)$alignment_percentage < 50,"cell_id"]
+remove <- pData(dat.relative)[pData(dat.relative)$total_reads < read_min & pData(dat.relative)$alignment_percentage < 50,"cell_id"]
 
-tbl1 <- table(pData(dat.relative[,remove])$age, pData(dat.relative[,remove])$sex,pData(dat.relative[,remove])$genotype)
+tbl1 <- table(pData(dat.relative[, remove])$age, pData(dat.relative[, remove])$sex, pData(dat.relative[, remove])$genotype)
 
-dat.relative.filtered<-dat.relative[,!(row.names(pData(dat.relative)) %in% remove)]
+dat.relative.filtered <- dat.relative[, !(row.names(pData(dat.relative)) %in% remove)]
 ```
 
 ### Iteratively run PCA and manually remove outliers
 ```{r PCA_filtering}
 # PCA on FPKM values
-dat.relative.pca<-prcomp(t(exprs(dat.relative.filtered)),scale=F,center=T)
+dat.relative.pca <- prcomp(t(exprs(dat.relative.filtered)), scale = F, center = T)
 ```
 
 ```{r figures, echo = F}
-p1 <- ggbiplot(dat.relative.pca,var.axes=F,groups=(dat.relative.pca$x[,1] > 5e+6)) + 
-  theme(aspect.ratio = 1, legend.position="none") + 
-  scale_color_manual(values=c("black", "red")) +
+p1 <- ggbiplot(dat.relative.pca, var.axes = F, groups = (dat.relative.pca$x[,1] > 5e+6)) + 
+  theme(aspect.ratio = 1, legend.position = "none") + 
+  scale_color_manual(values = c("black", "red")) +
   ggtitle("1. PC1 vs. PC2") 
 ```
 
@@ -220,148 +220,148 @@ dat.relative.filtered.pca<-prcomp(t(exprs(dat.relative.filtered)),scale=F,center
 
 Repeat iteratively until there are no obvious outliers
 ```{r echo = F, fig.width=7.5, fig.height = 10}
-p2 <- ggbiplot(dat.relative.filtered.pca,var.axes=F,groups=(dat.relative.filtered.pca$x[,1] > 5e+06 | dat.relative.filtered.pca$x[,2] > 3e+06)) + 
-  theme(aspect.ratio = 1, legend.position="none") +  
-  scale_color_manual(values=c("black", "red")) +
+p2 <- ggbiplot(dat.relative.filtered.pca, var.axes = F, groups = (dat.relative.filtered.pca$x[,1] > 5e+06 | dat.relative.filtered.pca$x[,2] > 3e+06)) + 
+  theme(aspect.ratio = 1, legend.position = "none") +  
+  scale_color_manual(values = c("black", "red")) +
   ggtitle("2. PC1 vs. PC2") 
 
-remove<-c(remove,names(which(dat.relative.filtered.pca$x[,1] > 5e+06 | dat.relative.filtered.pca$x[,2] > 3e+06)))
-dat.relative.filtered<-dat.relative[,!(row.names(pData(dat.relative)) %in% remove)]
+remove <- c(remove,names(which(dat.relative.filtered.pca$x[,1] > 5e+06 | dat.relative.filtered.pca$x[,2] > 3e+06)))
+dat.relative.filtered <- dat.relative[, !(row.names(pData(dat.relative)) %in% remove)]
 
-dat.relative.filtered.pca<-prcomp(t(exprs(dat.relative.filtered)),scale=F,center=T)
+dat.relative.filtered.pca <- prcomp(t(exprs(dat.relative.filtered)), scale = F, center = T)
 
-p3<-ggbiplot(dat.relative.filtered.pca,var.axes=F, groups=(dat.relative.filtered.pca$x[,1] > 3e+06 | dat.relative.filtered.pca$x[,2] < -2e+06)) + 
-  theme(aspect.ratio = 1, legend.position="none") + 
-  scale_color_manual(values=c("black", "red")) +
+p3 <- ggbiplot(dat.relative.filtered.pca, var.axes = F, groups = (dat.relative.filtered.pca$x[,1] > 3e+06 | dat.relative.filtered.pca$x[,2] < -2e+06)) + 
+  theme(aspect.ratio = 1, legend.position = "none") + 
+  scale_color_manual(values = c("black", "red")) +
   ggtitle("3. PC1 vs. PC2")
 
-remove<-c(remove,names(which(dat.relative.filtered.pca$x[,1] > 3e+06 | dat.relative.filtered.pca$x[,2] < -2e+06)))
-dat.relative.filtered<-dat.relative[,!(row.names(pData(dat.relative)) %in% remove)]
+remove <- c(remove,names(which(dat.relative.filtered.pca$x[,1] > 3e+06 | dat.relative.filtered.pca$x[,2] < -2e+06)))
+dat.relative.filtered <- dat.relative[, !(row.names(pData(dat.relative)) %in% remove)]
 
-dat.relative.filtered.pca<-prcomp(t(exprs(dat.relative.filtered)),scale=F,center=T)
+dat.relative.filtered.pca <- prcomp(t(exprs(dat.relative.filtered)), scale = F, center = T)
 
-p4<-ggbiplot(dat.relative.filtered.pca,var.axes=F, groups=(dat.relative.filtered.pca$x[,1] < -2e+06 | dat.relative.filtered.pca$x[,2] > 2e+06)) + 
-  theme(aspect.ratio = 1, legend.position="none") + 
-  scale_color_manual(values=c("black", "red")) +
+p4 <- ggbiplot(dat.relative.filtered.pca, var.axes = F, groups = (dat.relative.filtered.pca$x[,1] < -2e+06 | dat.relative.filtered.pca$x[,2] > 2e+06)) + 
+  theme(aspect.ratio = 1, legend.position = "none") + 
+  scale_color_manual(values = c("black", "red")) +
   ggtitle("4. PC1 vs. PC2")
 
-remove<-c(remove,names(which(dat.relative.filtered.pca$x[,1] < -2e+06 | dat.relative.filtered.pca$x[,2] > 2e+06)))
-dat.relative.filtered<-dat.relative[,!(row.names(pData(dat.relative)) %in% remove)]
+remove <- c(remove,names(which(dat.relative.filtered.pca$x[,1] < -2e+06 | dat.relative.filtered.pca$x[,2] > 2e+06)))
+dat.relative.filtered <- dat.relative[, !(row.names(pData(dat.relative)) %in% remove)]
 
-dat.relative.filtered.pca<-prcomp(t(exprs(dat.relative.filtered)),scale=F,center=T)
+dat.relative.filtered.pca <- prcomp(t(exprs(dat.relative.filtered)), scale = F, center = T)
 
-p5 <- ggbiplot(dat.relative.filtered.pca,var.axes=F,groups=(dat.relative.filtered.pca$x[,1] < -1e+06 | dat.relative.filtered.pca$x[,2] > 1e+06)) + 
-  theme(aspect.ratio = 1,legend.position="none") + 
-  scale_color_manual(values=c("black", "red")) +
+p5 <- ggbiplot(dat.relative.filtered.pca, var.axes = F, groups = (dat.relative.filtered.pca$x[,1] < -1e+06 | dat.relative.filtered.pca$x[,2] > 1e+06)) + 
+  theme(aspect.ratio = 1,legend.position = "none") + 
+  scale_color_manual(values = c("black", "red")) +
   ggtitle("5. PC1 vs. PC2")
 
-remove<-c(remove,names(which(dat.relative.filtered.pca$x[,1] < -1e+06 | dat.relative.filtered.pca$x[,2] > 1e+06)))
-dat.relative.filtered<-dat.relative[,!(row.names(pData(dat.relative)) %in% remove)]
+remove <- c(remove, names(which(dat.relative.filtered.pca$x[,1] < -1e+06 | dat.relative.filtered.pca$x[,2] > 1e+06)))
+dat.relative.filtered <- dat.relative[, !(row.names(pData(dat.relative)) %in% remove)]
 
-dat.relative.filtered.pca<-prcomp(t(exprs(dat.relative.filtered)),scale=F,center=T)
+dat.relative.filtered.pca <- prcomp(t(exprs(dat.relative.filtered)), scale = F, center = T)
 
-p6<-ggbiplot(dat.relative.filtered.pca,var.axes=F,groups=(dat.relative.filtered.pca$x[,1] < -1e+06 | dat.relative.filtered.pca$x[,2] > 1e+06)) + 
-  theme(aspect.ratio = 1, legend.position="none") + 
-  scale_color_manual(values=c("black", "red")) +
+p6 <- ggbiplot(dat.relative.filtered.pca, var.axes = F, groups = (dat.relative.filtered.pca$x[,1] < -1e+06 | dat.relative.filtered.pca$x[,2] > 1e+06)) + 
+  theme(aspect.ratio = 1, legend.position = "none") + 
+  scale_color_manual(values = c("black", "red")) +
   ggtitle("6. PC1 vs. PC2")
 
-remove<-c(remove,names(which(dat.relative.filtered.pca$x[,1] < -1e+06 | dat.relative.filtered.pca$x[,2] > 1e+06)))
-dat.relative.filtered<-dat.relative[,!(row.names(pData(dat.relative)) %in% remove)]
+remove <- c(remove,names(which(dat.relative.filtered.pca$x[,1] < -1e+06 | dat.relative.filtered.pca$x[,2] > 1e+06)))
+dat.relative.filtered <- dat.relative[, !(row.names(pData(dat.relative)) %in% remove)]
 
-dat.relative.filtered.pca<-prcomp(t(exprs(dat.relative.filtered)),scale=F,center=T)
+dat.relative.filtered.pca <- prcomp(t(exprs(dat.relative.filtered)), scale = F, center = T)
 
-p7<-ggbiplot(dat.relative.filtered.pca,var.axes=F,groups=(dat.relative.filtered.pca$x[,1] < -1e+06 | dat.relative.filtered.pca$x[,2] > 5e+05)) +
-  theme(aspect.ratio = 1, legend.position="none") + 
-  scale_color_manual(values=c("black", "red")) +
+p7 <- ggbiplot(dat.relative.filtered.pca, var.axes = F, groups = (dat.relative.filtered.pca$x[,1] < -1e+06 | dat.relative.filtered.pca$x[,2] > 5e+05)) +
+  theme(aspect.ratio = 1, legend.position = "none") + 
+  scale_color_manual(values = c("black", "red")) +
   ggtitle("7. PC1 vs. PC2")
 
-remove<-c(remove,names(which(dat.relative.filtered.pca$x[,1] < -1e+06 | dat.relative.filtered.pca$x[,2] > 5e+05)))
-dat.relative.filtered<-dat.relative[,!(row.names(pData(dat.relative)) %in% remove)]
+remove <- c(remove, names(which(dat.relative.filtered.pca$x[,1] < -1e+06 | dat.relative.filtered.pca$x[,2] > 5e+05)))
+dat.relative.filtered <- dat.relative[, !(row.names(pData(dat.relative)) %in% remove)]
 
-dat.relative.filtered.pca<-prcomp(t(exprs(dat.relative.filtered)),scale=F,center=T)
+dat.relative.filtered.pca <- prcomp(t(exprs(dat.relative.filtered)), scale = F, center = T)
 
-p8<-ggbiplot(dat.relative.filtered.pca,var.axes=F) +
+p8 <- ggbiplot(dat.relative.filtered.pca, var.axes = F) +
   theme(aspect.ratio = 1) + 
   ggtitle("8. PC1 vs. PC2")
 
-write.table(x = remove,"outliers.txt",quote=F,sep="\n",row.names=F,col.names=F)
+write.table(x = remove, "outliers.txt", quote = F, sep = "\n", row.names = F, col.names = F)
 
-grid.arrange(p1,p2,p3,p4,p5,p6,p7,p8,ncol=4)
+grid.arrange(p1, p2, p3, p4, p5, p6, p7, p8, ncol = 4)
 
 pg1 <- ggplot(pData(dat.relative)) +
-  geom_point(aes(x=total_reads,y=alignment_percentage,col=ifelse(pData(dat.relative)$cell_id %in% remove,"Removed","Kept"))) +
-  labs(x = "Total Number of Reads",y="% Reads Aligned",color="Status") + 
-  scale_color_manual(values=c("black","red")) +
-  theme(legend.position = c(0.85,0.94))
+  geom_point(aes(x = total_reads, y = alignment_percentage, col = ifelse(pData(dat.relative)$cell_id %in% remove, "Removed", "Kept"))) +
+  labs(x = "Total Number of Reads", y = "% Reads Aligned", color = "Status") + 
+  scale_color_manual(values = c("black","red")) +
+  theme(legend.position = c(0.85, 0.94))
      
 
-pg2<-pData(dat.relative) %>%
-  mutate(group=ifelse(pData(dat.relative)$cell_id %in% remove,"Removed","Kept")) %>%
+pg2 <- pData(dat.relative) %>%
+  mutate(group = ifelse(pData(dat.relative)$cell_id %in% remove, "Removed", "Kept")) %>%
   ggplot(.) + 
-  stat_density(aes(x=total_reads), fill="gray70", color="gray60", alpha=0.3) +
+  stat_density(aes(x = total_reads), fill = "gray70", color = "gray60", alpha = 0.3) +
   facet_wrap(~group) +
   scale_fill_brewer(palette = "Set1") +
   scale_color_brewer(palette = "Set1") +
   theme_bw() +
   xlab("Total Reads")
 
-pg3<-pData(dat.relative) %>%
-  mutate(group=ifelse(pData(dat.relative)$cell_id %in% remove,"Removed","Kept")) %>%
+pg3 <- pData(dat.relative) %>%
+  mutate(group = ifelse(pData(dat.relative)$cell_id %in% remove, "Removed", "Kept")) %>%
   ggplot(.) + 
-  stat_density(aes(x=alignment_percentage), fill="gray70", color="gray60", alpha=0.3) +
+  stat_density(aes(x = alignment_percentage), fill = "gray70", color = "gray60", alpha = 0.3) +
   facet_wrap(~group) +
   scale_fill_brewer(palette = "Set1") +
   scale_color_brewer(palette = "Set1") +
   theme_bw() +
   xlab("% Aligned Reads")
 
-pg4<-pData(dat.relative) %>%
+pg4 <- pData(dat.relative) %>%
   filter(cell_id %in% remove) %>%
-  mutate(group=paste(age, sex, genotype)) %>%
-  ggplot(.,aes(x=group,fill=sex,alpha=as.numeric(factor(genotype)))) +
+  mutate(group = paste(age, sex, genotype)) %>%
+  ggplot(., aes(x = group, fill = sex, alpha=as.numeric(factor(genotype)))) +
     geom_bar() +
-    scale_alpha("Genotype",range=c(0.4,1),breaks=c(2,1),labels=c("hom","het")) +
-    scale_fill_brewer("Sex",palette="Set1") +
-    scale_y_continuous(limits = c(NA,27),expand = c(0,0)) +
-    theme(axis.ticks.x = element_blank(),axis.title.x=element_blank(), legend.position = c(0.9,0.9)) +
-    geom_text(stat="count", aes(label = ..count..),vjust=-0.5,alpha = 1)
+    scale_alpha("Genotype", range = c(0.4, 1), breaks = c(2, 1), labels = c("hom","het")) +
+    scale_fill_brewer("Sex", palette = "Set1") +
+    scale_y_continuous(limits = c(NA, 27), expand = c(0, 0)) +
+    theme(axis.ticks.x = element_blank(), axis.title.x = element_blank(), legend.position = c(0.9, 0.9)) +
+    geom_text(stat = "count", aes(label = ..count..), vjust = -0.5, alpha = 1)
 #  labs(x="Genotype and Sex",y="# Cells",title="Cells Remaining")
 
-grid1<-plot_grid(pg2,pg3,ncol=2)
-grid2<-plot_grid(pg1,pg4,ncol=2)
-pg<-plot_grid(grid2,grid1,nrow=2, rel_heights = c(2,1))
-save_plot("Figure 3.pdf", pg, base_height=16, base_width = 22)
+grid1 <- plot_grid(pg2, pg3, ncol = 2)
+grid2 <- plot_grid(pg1, pg4, ncol = 2)
+pg <- plot_grid(grid2, grid1, nrow = 2, rel_heights = c(2, 1))
+save_plot("Figure 3.pdf", pg, base_height = 16, base_width = 22)
 ```
 
 # Rerun Cuffnorm on remaining 1296 cells and import data
 ```{r Post_rerunning_Cuffnorm}
 # Gene FPKMs
-fpkms<-read.delim("genes.fpkm_table",row.names=1,stringsAsFactors = F)
-colnames(fpkms)<-unlist(strsplit(as.character(colnames(fpkms)),"_0$"))
+fpkms <- read.delim("genes.fpkm_table", row.names = 1, stringsAsFactors = F)
+colnames(fpkms) <- unlist(strsplit(as.character(colnames(fpkms)), "_0$"))
 
 # Isoform FPKMs
-isoform_fpkms<-read.delim("isoforms.fpkm_table",row.names=1,stringsAsFactors = F)
-colnames(isoform_fpkms)<-unlist(strsplit(as.character(colnames(isoform_fpkms)),"_0$"))
+isoform_fpkms <- read.delim("isoforms.fpkm_table", row.names = 1, stringsAsFactors = F)
+colnames(isoform_fpkms) <- unlist(strsplit(as.character(colnames(isoform_fpkms)), "_0$"))
 
 # Sample Annotation
-sample_ann<-read.delim("samples.table",stringsAsFactors = F)
-sample_ann<-sample_ann[,c(-2,-5)] # Remove file path and external scale (external scale = 1 for all cells)
-names(sample_ann)<-c("cell_id",names(sample_ann)[2:3]) # Rename sample_id column as cell_id
-sample_ann$cell_id<-unlist(strsplit(as.character(sample_ann$cell_id),"_0$")) # Remove "_0" after cell ids
-sample_info<-merge(sample_ann,master_cell_sheet,by='cell_id')
-sample_info<-merge(sample_info,alignment_rates,by="cell_id")
-rownames(sample_info)<-sample_info[,1]
+sample_ann <- read.delim("samples.table", stringsAsFactors = F)
+sample_ann <- sample_ann[, c(-2, -5)] # Remove file path and external scale (external scale = 1 for all cells)
+names(sample_ann) <- c("cell_id", names(sample_ann)[2:3]) # Rename sample_id column as cell_id
+sample_ann$cell_id <- unlist(strsplit(as.character(sample_ann$cell_id), "_0$")) # Remove "_0" after cell ids
+sample_info <- merge(sample_ann, master_cell_sheet, by = 'cell_id')
+sample_info <- merge(sample_info, alignment_rates, by = "cell_id")
+rownames(sample_info) <- sample_info[, 1]
 
 # Gene Annotation
-gene_ann<-read.delim("genes.attr_table",row.names=1,stringsAsFactors = F)
+gene_ann <- read.delim("genes.attr_table", row.names = 1, stringsAsFactors = F)
 
-fd<-new("AnnotatedDataFrame",data=gene_ann)
-pd<-new("AnnotatedDataFrame",data=sample_info)
+fd <- new("AnnotatedDataFrame", data = gene_ann)
+pd <- new("AnnotatedDataFrame", data = sample_info)
 
 # Create cell data set object
-dat.relative.1296 <- newCellDataSet(cellData=as.matrix(fpkms),
-                      phenoData=pd,
-                      featureData=fd)
+dat.relative.1296 <- newCellDataSet(cellData = as.matrix(fpkms),
+                      phenoData = pd,
+                      featureData = fd)
 
 fData(dat.relative.1296)$num_cells_expressed <- rowSums(exprs(dat.relative.1296) > 0)
 pData(dat.relative.1296)$num_genes_expressed <- colSums(exprs(dat.relative.1296) > 0)
@@ -373,41 +373,41 @@ pData(dat.relative.1296) %>%
   ggplot(.) +
   geom_density(aes(x = num_genes_expressed, color = group), alpha = 0.2) +
   geom_vline(xintercept = 1000, lty = "dashed") +
-  theme(legend.position = c(0.75,0.85))
+  theme(legend.position = c(0.75, 0.85))
 
 # Remove cells expressing very few genes
-dat.relative.filtered <- dat.relative.1296[,pData(dat.relative.1296)$num_genes_expressed > 1000]
+dat.relative.filtered <- dat.relative.1296[, pData(dat.relative.1296)$num_genes_expressed > 1000]
 ```
 
 ### Run PCA on second round of cuffnorm data
 ```{r}
-dat.relative.filtered.pca<-prcomp(t(exprs(dat.relative.filtered)),scale=F,center=T)
+dat.relative.filtered.pca <- prcomp(t(exprs(dat.relative.filtered)), scale = F, center = T)
 ```
 
 ```{r echo = F}
-p1 <- ggbiplot(dat.relative.filtered.pca,var.axes=F,groups=(dat.relative.filtered.pca$x[,1] > 5e+05 | dat.relative.filtered.pca$x[,2] > 5e+05)) + 
-  theme(aspect.ratio = 1, legend.position="none") +  
-  scale_color_manual(values=c("black", "red")) +
+p1 <- ggbiplot(dat.relative.filtered.pca, var.axes = F, groups = (dat.relative.filtered.pca$x[,1] > 5e+05 | dat.relative.filtered.pca$x[,2] > 5e+05)) + 
+  theme(aspect.ratio = 1, legend.position = "none") +  
+  scale_color_manual(values = c("black", "red")) +
   ggtitle("1. PC1 vs. PC2") 
 
-remove<-names(which(dat.relative.filtered.pca$x[,1] > 5e+05 | dat.relative.filtered.pca$x[,2] > 5e+05))
-dat.relative.filtered<-dat.relative.filtered[,!(row.names(pData(dat.relative.filtered)) %in% remove)]
+remove <- names(which(dat.relative.filtered.pca$x[,1] > 5e+05 | dat.relative.filtered.pca$x[,2] > 5e+05))
+dat.relative.filtered <- dat.relative.filtered[, !(row.names(pData(dat.relative.filtered)) %in% remove)]
 
-dat.relative.filtered.pca<-prcomp(t(exprs(dat.relative.filtered)),scale=F,center=T)
+dat.relative.filtered.pca <- prcomp(t(exprs(dat.relative.filtered)), scale = F, center = T)
 
-p2 <- ggbiplot(dat.relative.filtered.pca,var.axes=F,groups=(dat.relative.filtered.pca$x[,1] > 5e+05 | dat.relative.filtered.pca$x[,2] > 5e+05)) + 
-  theme(aspect.ratio = 1, legend.position="none") +  
-  scale_color_manual(values=c("black", "red")) +
+p2 <- ggbiplot(dat.relative.filtered.pca, var.axes = F, groups = (dat.relative.filtered.pca$x[,1] > 5e+05 | dat.relative.filtered.pca$x[,2] > 5e+05)) + 
+  theme(aspect.ratio = 1, legend.position = "none") +  
+  scale_color_manual(values = c("black", "red")) +
   ggtitle("2. PC1 vs. PC2") 
 
-remove<-c(remove,names(which(dat.relative.filtered.pca$x[,1] > 5e+05 | dat.relative.filtered.pca$x[,2] > 5e+05)))
-dat.relative.filtered<-dat.relative.filtered[,!(row.names(pData(dat.relative.filtered)) %in% remove)]
+remove <- c(remove, names(which(dat.relative.filtered.pca$x[,1] > 5e+05 | dat.relative.filtered.pca$x[,2] > 5e+05)))
+dat.relative.filtered <- dat.relative.filtered[, !(row.names(pData(dat.relative.filtered)) %in% remove)]
 
-dat.relative.filtered.pca<-prcomp(t(exprs(dat.relative.filtered)),scale=F,center=T)
+dat.relative.filtered.pca <- prcomp(t(exprs(dat.relative.filtered)), scale = F, center = T)
 
-p3 <- ggbiplot(dat.relative.filtered.pca,var.axes=F,groups=(dat.relative.filtered.pca$x[,1] > 5e+05 | dat.relative.filtered.pca$x[,2] > 5e+05)) + 
-  theme(aspect.ratio = 1, legend.position="none") +  
-  scale_color_manual(values=c("black", "red")) +
+p3 <- ggbiplot(dat.relative.filtered.pca, var.axes = F, groups = (dat.relative.filtered.pca$x[,1] > 5e+05 | dat.relative.filtered.pca$x[,2] > 5e+05)) + 
+  theme(aspect.ratio = 1, legend.position = "none") +  
+  scale_color_manual(values = c("black", "red")) +
   ggtitle("3. PC1 vs. PC2") 
 
 grid.arrange(p1, p2, p3, nrow = 1)
@@ -415,47 +415,46 @@ grid.arrange(p1, p2, p3, nrow = 1)
 
 ### Convert FPKM to CPC
 ```{r run_relative2abs}
-isoform_t_estimate<-estimate_t(isoform_fpkms)
+isoform_t_estimate <- estimate_t(isoform_fpkms)
 
-fpkm_matrix_adj<-relative2abs(dat.relative.filtered,cores=detectCores()-1,t_estimate = isoform_t_estimate)
+fpkm_matrix_adj <- relative2abs(dat.relative.filtered, cores = detectCores() - 1, t_estimate = isoform_t_estimate)
 
 # Create new cell data set with CPC values
 dat.filtered <- newCellDataSet(as.matrix(fpkm_matrix_adj),
                       phenoData = pd[rownames(pd) %in% colnames(fpkm_matrix_adj)],
-                      featureData=fd,
-                      expressionFamily=negbinomial.size(),
-                      lowerDetectionLimit=1)
+                      featureData = fd,
+                      expressionFamily = negbinomial.size(),
+                      lowerDetectionLimit = 1)
 ```
 
 ### Add and format metadata
 ```{r}
 pData(dat.filtered)$num_genes_expressed <- colSums(exprs(dat.filtered) > 0)
 pData(dat.filtered)$total_mRNAs <- colSums(exprs(dat.filtered))
-pData(dat.filtered)$mean_expr<-esApply(dat.filtered,2,function(x){mean(x)})
-pData(dat.filtered)$sd_expr<-esApply(dat.filtered,2,function(x){sd(x)})
-pData(dat.filtered)$genotype<-factor(pData(dat.filtered)$genotype)
-pData(dat.filtered)$sex<-factor(pData(dat.filtered)$sex)
-pData(dat.filtered)$batch<-factor(pData(dat.filtered)$batch)
-pData(dat.filtered)$source_plate<-factor(pData(dat.filtered)$source_plate)
-pData(dat.filtered)$split_plate<-factor(pData(dat.filtered)$split_plate)
-pData(dat.filtered)$RT_date<-factor(pData(dat.filtered)$RT_date)
+pData(dat.filtered)$mean_expr <- esApply(dat.filtered, 2, function(x){mean(x)})
+pData(dat.filtered)$sd_expr <- esApply(dat.filtered, 2, function(x){sd(x)})
+pData(dat.filtered)$genotype <- factor(pData(dat.filtered)$genotype)
+pData(dat.filtered)$sex <- factor(pData(dat.filtered)$sex)
+pData(dat.filtered)$batch <- factor(pData(dat.filtered)$batch)
+pData(dat.filtered)$source_plate <- factor(pData(dat.filtered)$source_plate)
+pData(dat.filtered)$split_plate <- factor(pData(dat.filtered)$split_plate)
+pData(dat.filtered)$RT_date <- factor(pData(dat.filtered)$RT_date)
 
 fData(dat.filtered)$num_cells_expressed <- rowSums(exprs(dat.filtered) > 0)
-fData(dat.filtered)$gene_id<-rownames(fData(dat.filtered))
-fData(dat.filtered)$mean_expr<-esApply(dat.filtered,1,function(x){mean(x)})
-fData(dat.filtered)$sd_expr<-esApply(dat.filtered,1,function(x){sd(x)})
-fData(dat.filtered)$bcv<-(fData(dat.filtered)$sd_expr/fData(dat.filtered)$mean_expr)**2
-fData(dat.filtered)$percent_detection<-
-  (fData(dat.filtered)$num_cells_expressed/dim(dat.filtered)[2])*100
+fData(dat.filtered)$gene_id <- rownames(fData(dat.filtered))
+fData(dat.filtered)$mean_expr <- esApply(dat.filtered, 1, function(x){mean(x)})
+fData(dat.filtered)$sd_expr <- esApply(dat.filtered, 1, function(x){sd(x)})
+fData(dat.filtered)$bcv <- (fData(dat.filtered)$sd_expr/fData(dat.filtered)$mean_expr)**2
+fData(dat.filtered)$percent_detection <- (fData(dat.filtered)$num_cells_expressed/dim(dat.filtered)[2])*100
 
-dat.filtered@dim_reduce_type<-"DDRTree"
-dat.filtered@auxOrderingData<-new.env()
+dat.filtered@dim_reduce_type <- "DDRTree"
+dat.filtered@auxOrderingData <- new.env()
 ```
 
 # Determine Expressed Genes
 A gene is considered expressed if it is detected at non-zero CPC in at least 20 cells (approx. 10% of cells in one condition), and the standard deviation is not zero.
 ```{r Determine_expressed_genes }
-expressed_genes<-rownames(fData(dat.filtered)[fData(dat.filtered)$num_cells_expressed >= 20 & fData(dat.filtered)$sd_expr > 1e-20,])
+expressed_genes <- rownames(fData(dat.filtered)[fData(dat.filtered)$num_cells_expressed >= 20 & fData(dat.filtered)$sd_expr > 1e-20,])
 # Set sd lower limit effectively to 0 - this excludes 3 more genes than setting it exactly to zero, but these genes have sd < 2e-35, which prcomp considers to be constant/zero variance
 #14,319 genes
 
@@ -474,7 +473,7 @@ ggplot(fData(dat.filtered)) +
 ```{r remove_low_lib_quality}
 dat_withmito <- dat.filtered
 
-mito_genes <- fData(dat_withmito)[str_detect(fData(dat_withmito)$gene_short_name, pattern = "mt-"),"gene_short_name"]
+mito_genes <- fData(dat_withmito)[str_detect(fData(dat_withmito)$gene_short_name, pattern = "mt-"), "gene_short_name"]
 mito_genes <- lookupGeneId(dat_withmito, mito_genes)
 
 mito <- exprs(dat_withmito[mito_genes,])
@@ -500,63 +499,64 @@ ggplot(as.data.frame(mt_ratio)) +
 
 # PCA on Cleaned Data (Expressed Genes)
 ```{r}
-dat.filtered.pca<-prcomp(t(exprs(dat.filtered[expressed_genes,])),scale=T,center=T)
+dat.filtered.pca <- prcomp(t(exprs(dat.filtered[expressed_genes,])), scale = T, center = T)
 ```
 
 ```{r echo = F,fig.height=6.5,fig.width=7.5}
 screeplot(dat.filtered.pca, npcs = 20, type = "lines")
 
-ggbiplot(dat.filtered.pca,var.axes=F,groups=pData(dat.filtered)$genotype,alpha=0) + 
-  theme(aspect.ratio = 1,plot.title = element_text(size=12), axis.title = element_text(size=8), legend.title = element_text(size=8), legend.text=element_text(size=7)) + 
+ggbiplot(dat.filtered.pca, var.axes = F, groups = pData(dat.filtered)$genotype, alpha = 0) + 
+  theme(aspect.ratio = 1,plot.title = element_text(size = 12), axis.title = element_text(size = 8), legend.title = element_text(size = 8), legend.text = element_text(size = 7)) + 
   ggtitle("PC1 vs. PC2") + 
-  scale_color_brewer("Genotype",palette="Set1") +  
-  geom_point(aes(color=pData(dat.filtered)$genotype), size = 0.6)
+  scale_color_brewer("Genotype", palette = "Set1") +  
+  geom_point(aes(color = pData(dat.filtered)$genotype), size = 0.6)
 # reminder - genotype is biased by age (more hets in E12.5 than E14.5)
 
-p1<-ggbiplot(dat.filtered.pca,var.axes=F,groups=pData(dat.filtered)$num_genes_expressed,alpha=0) + 
-  theme(aspect.ratio = 1,plot.title = element_text(size=12), axis.title = element_text(size=8), legend.title = element_text(size=8), legend.text=element_text(size=7)) + 
+p1 <- ggbiplot(dat.filtered.pca, var.axes = F, groups = pData(dat.filtered)$num_genes_expressed, alpha = 0) + 
+  theme(aspect.ratio = 1,plot.title = element_text(size = 12), axis.title = element_text(size = 8), legend.title = element_text(size = 8), legend.text = element_text(size = 7)) + 
   ggtitle("PC1 vs. PC2") + 
-  scale_color_continuous(name="Number\nof Genes\nExpressed") +  
-  geom_point(aes(color=pData(dat.filtered)$num_genes_expressed), size = 0.6)
+  scale_color_continuous(name = "Number\nof Genes\nExpressed") +  
+  geom_point(aes(color = pData(dat.filtered)$num_genes_expressed), size = 0.6)
 
-p2<-ggbiplot(dat.filtered.pca,var.axes=F,groups=pData(dat.filtered)$batch,alpha=0) + 
-  theme(aspect.ratio = 1,plot.title = element_text(size=12), axis.title = element_text(size=8), legend.title = element_text(size=8), legend.text=element_text(size=7)) + 
+p2 <- ggbiplot(dat.filtered.pca, var.axes = F, groups = pData(dat.filtered)$batch, alpha = 0) + 
+  theme(aspect.ratio = 1, plot.title = element_text(size = 12), axis.title = element_text(size = 8), legend.title = element_text(size = 8), legend.text = element_text(size = 7)) + 
   ggtitle("PC1 vs. PC2") + 
-  scale_color_brewer("Batch",palette="Set1") +  
-  geom_point(aes(color=pData(dat.filtered)$batch), size = 0.6)
+  scale_color_brewer("Batch", palette = "Set1") +  
+  geom_point(aes(color = pData(dat.filtered)$batch), size = 0.6)
 
-p3<-ggbiplot(dat.filtered.pca,var.axes=F,groups=pData(dat.filtered)$sex,alpha=0) + 
-  theme(aspect.ratio = 1,plot.title = element_text(size=12), axis.title = element_text(size=8), legend.title = element_text(size=8), legend.text=element_text(size=7)) + 
+p3 <- ggbiplot(dat.filtered.pca, var.axes = F, groups = pData(dat.filtered)$sex, alpha = 0) + 
+  theme(aspect.ratio = 1, plot.title = element_text(size = 12), axis.title = element_text(size = 8), legend.title = element_text(size = 8), legend.text = element_text(size = 7)) + 
   ggtitle("PC1 vs. PC2") + 
-  scale_color_brewer("Sex",palette="Set1") +  
-  geom_point(aes(color=pData(dat.filtered)$sex), size = 0.6)
+  scale_color_brewer("Sex", palette = "Set1") +  
+  geom_point(aes(color = pData(dat.filtered)$sex), size = 0.6)
 
-p4<-ggbiplot(dat.filtered.pca,var.axes=F,groups=pData(dat.filtered)$total_mRNAs,alpha=0) + 
-  theme(aspect.ratio = 1,plot.title = element_text(size=12), axis.title = element_text(size=8), legend.title = element_text(size=8), legend.text=element_text(size=7)) + 
+p4 <- ggbiplot(dat.filtered.pca, var.axes = F, groups = pData(dat.filtered)$total_mRNAs, alpha = 0) + 
+  theme(aspect.ratio = 1, plot.title = element_text(size = 12), axis.title = element_text(size =8), legend.title = element_text(size = 8), legend.text = element_text(size = 7)) + 
   ggtitle("PC1 vs. PC2") + 
-  scale_color_continuous(name="Total\nmRNAs") +  
-  geom_point(aes(color=pData(dat.filtered)$total_mRNAs), size = 0.6)
+  scale_color_continuous(name = "Total\nmRNAs") +  
+  geom_point(aes(color = pData(dat.filtered)$total_mRNAs), size = 0.6)
 
-grid.draw(rbind(cbind(ggplotGrob(p1), ggplotGrob(p2), size="last"),cbind(ggplotGrob(p3), ggplotGrob(p4), size="last"),size="last"))
+grid.draw(rbind(cbind(ggplotGrob(p1), ggplotGrob(p2), size = "last"), cbind(ggplotGrob(p3), ggplotGrob(p4), size = "last"), size = "last"))
 ```
 
 # Plots of Cleaned Cell Data Set
 ```{r cleaned_figures, echo = F, fig.height=5,fig.width=5}
-ggplot(pData(dat.filtered),aes(x=genotype))+geom_bar(aes(fill=batch)) + 
+ggplot(pData(dat.filtered), aes(x = genotype)) + 
+  geom_bar(aes(fill = batch)) + 
   facet_wrap(~age + sex, nrow = 1) + 
-  scale_fill_brewer("Batch",palette="Set1") +
-  geom_text(stat="count", aes(label = ..count..),vjust=-0.5) +
-  labs(x="Genotype and Sex",y="# Cells",title="Cells Passing Filters")  +
-  theme(plot.title = element_text(size=12), axis.title = element_text(size=10), legend.text=element_text(size=8)) +
+  scale_fill_brewer("Batch", palette="Set1") +
+  geom_text(stat = "count", aes(label = ..count..), vjust = -0.5) +
+  labs(x = "Genotype and Sex", y = "# Cells", title = "Cells Passing Filters")  +
+  theme(plot.title = element_text(size = 12), axis.title = element_text(size = 10), legend.text = element_text(size = 8)) +
   scale_y_continuous(expand = expand_scale(mult = c(0, .05)))
 ```
 
-```{r saveCDS, echo=F}
-saveRDS(dat.filtered,file="datfiltered_postQC.rds")
-saveRDS(expressed_genes,file="expressed_genes.rds")
+```{r saveCDS, echo = F}
+saveRDS(dat.filtered, file = "datfiltered_postQC.rds")
+saveRDS(expressed_genes, file = "expressed_genes.rds")
 ```
 
 # Session Info
-```{r echo=FALSE}
+```{r echo = FALSE}
 sessionInfo()
 ```
