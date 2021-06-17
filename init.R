@@ -2,6 +2,7 @@ library(reticulate)
 use_python(python="/Library/Frameworks/Python.framework/Versions/2.7/bin/python",required=TRUE)
 library(umapr)
 library(ggplot2)
+library(RColorBrewer)
 library(ggbiplot)
 library(monocle)
 library(gridExtra)
@@ -13,6 +14,8 @@ library(CoGAPS)
 library(stringr)
 library(cowplot)
 library(viridis)
+library(corrplot)
+library(projectR)
 
 #add shape arg to UMAP
 plotUMAP <- function(cds, markers = NULL, color_by = NULL, shape = NULL, logMode = T, scaled = F, size = 1.5, ...){
@@ -25,14 +28,14 @@ plotUMAP <- function(cds, markers = NULL, color_by = NULL, shape = NULL, logMode
       markers <- markers[markers %in% features$gene_short_name]
     }
     genes <- expr[rownames(features) %in% lookupGeneId(cds, markers), , drop = F]
+    if(logMode){
+      genes <- log10(genes + 1)
+    }
     if(scaled){
         geneMax <- rowMax(genes)
         genes <- genes/geneMax
     }
     genes <- t(genes)
-    if(logMode){
-      genes <- log10(genes + 1)
-    }
     genes <- melt(genes)
     colnames(genes) <- c("cell_id", "gene_id", "value")
     genes <- merge(genes, features[, c("gene_id", "gene_short_name")], by.x = "gene_id", by.y = "gene_id", all.x = TRUE, sort = FALSE)
@@ -41,8 +44,7 @@ plotUMAP <- function(cds, markers = NULL, color_by = NULL, shape = NULL, logMode
       shape <- rep(pheno[, shape], length(markers))
     } 
     p <- ggplot(tmp, aes(x = UMAP1, y = UMAP2)) + 
-      geom_point(aes_string(shape = shape, color = "value"), size = size, ...) + 
-      theme_bw()
+      geom_point(aes_string(shape = shape, color = "value"), size = size, ...)
     if(logMode){
       if(scaled){
         p <- p + scale_color_viridis("log10(CPC + 1)\nscaled to max", option = "C")   
@@ -63,8 +65,7 @@ plotUMAP <- function(cds, markers = NULL, color_by = NULL, shape = NULL, logMode
     }
   }else{
     p <- ggplot(pheno, aes(x = UMAP1, y = UMAP2)) +
-      geom_point(aes_string(color = color_by, shape = shape), size = size, ...) + 
-      theme_bw()
+      geom_point(aes_string(color = color_by, shape = shape), size = size, ...)
     if(is.discrete(color_by)){
       n_colors <- length(unique(pheno[,color_by]))
       if(n_colors <= 9){
@@ -78,7 +79,6 @@ plotUMAP <- function(cds, markers = NULL, color_by = NULL, shape = NULL, logMode
   }
   return(p)
 }
-
 
 ##################
 #Helper Utils

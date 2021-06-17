@@ -24,44 +24,11 @@ source('init.R')
 ```{r neuron_gene_selection}
 dat.neurons <- dat.filtered[,!pData(dat.filtered)$final_celltype %in% c("Progenitor/Glia") & !pData(dat.filtered)$cluster == 8]
 # 385 cells
-
-fData(dat.neurons)$num_cells_expressed <- rowSums(exprs(dat.neurons) > 0)
-fData(dat.neurons)$mean_expr <- esApply(dat.neurons,1,function(x){mean(x)})
-fData(dat.neurons)$sd_expr <- esApply(dat.neurons,1,function(x){sd(x)})
-fData(dat.neurons)$bcv <-
-  (fData(dat.neurons)$sd_expr/fData(dat.neurons)$mean_expr)**2
-fData(dat.neurons)$percent_detection <-
-  (fData(dat.neurons)$num_cells_expressed/dim(dat.neurons)[2])*100
-
-neuron_expressed_genes <- rownames(fData(dat.neurons)[fData(dat.neurons)$num_cells_expressed > 20 &fData(dat.neurons)$sd_expr > .Machine$double.eps,])
-#Expressed in at least 20 cells (5%) at > 0 CPC with SD > 0
-#11,892 genes
-```
-
-# Normalization by sequencing depth
-```{r normalize_by_read_depth}
-# sum across expressed genes for each cell and divide all gene values by sum to normalize by read depth
-dat.neurons.expressed <- dat.neurons[neuron_expressed_genes,]
-dat.neurons.expressed.normalized <- dat.neurons.expressed
-exprs(dat.neurons.expressed.normalized) <- apply(exprs(dat.neurons.expressed), 2, function(x){x/sum(x)})*1e+5
-
-fData(dat.neurons.expressed.normalized)$sd_expr <- esApply(dat.neurons.expressed.normalized, 1, function(x){sd(x)})
-```
-
-```{r neuron_PCA}
-neurons.pca <- prcomp(t(log10(exprs(dat.neurons.expressed.normalized) + 1)), scale = T, center = T)
-
-screeplot(neurons.pca, type = "lines", npcs = 20)
-
-ggbiplot(neurons.pca, var.axes = F, groups = pData(dat.neurons[neuron_expressed_genes,])$batch, ellipse = T) + 
-  scale_color_brewer("Batch", palette = "Set1") + 
-  ggtitle("PCA on 13,403 expressed genes in the neuron subset\nPost-normalization") + 
-  theme(aspect.ratio = 1)
 ```
 
 ### Differential test WRT genotype
 ```{r}
-neuron_genotype_diff_test <-  differentialGeneTest(dat.neurons[neuron_expressed_genes,], fullModelFormulaStr = "~batch + sex + final_celltype + genotype", reducedModelFormulaStr = "~batch + sex + final_celltype", cores=detectCores()-1)
+neuron_genotype_diff_test <-  differentialGeneTest(dat.neurons[expressed_genes,], fullModelFormulaStr = "~batch + sex + genotype", reducedModelFormulaStr = "~batch + sex", cores = detectCores() - 1)
 
 neuron_genotype_diff_test_sorted <- neuron_genotype_diff_test[order(neuron_genotype_diff_test$qval),]
 
@@ -70,39 +37,41 @@ neuron_genotype_diff_test_sigGenes <- rownames(neuron_genotype_diff_test_sorted[
 tmp <- t(scale(t(exprs(dat.neurons[neuron_genotype_diff_test_sigGenes,])),scale = T, center = T))
 heatmap_data <- log(tmp - min(tmp) + 1)
 
-myLower <- (0)
-myUpper <- (2.3)
+#myLower <- (0)
+#myUpper <- (2.3)
 
-heatmap_data[heatmap_data < myLower] <- myLower
-heatmap_data[heatmap_data > myUpper] <- myUpper
+#heatmap_data[heatmap_data < myLower] <- myLower
+#heatmap_data[heatmap_data > myUpper] <- myUpper
 
 rownames(heatmap_data) <- lookupGeneName(dat.neurons, rownames(heatmap_data))
 
-heatmap_annotation <- pData(dat.neurons)[,c("final_celltype","genotype","sex","cluster")]
+heatmap_annotation <- pData(dat.neurons)[,c("final_celltype","genotype","cluster")]
 
 heatmap_colors <- list(
-"Cell Type" =  c("Neuron" = "#377eb8", "Transition Cell" = "#FF7F00", "Acetylcholinergic Neuron" = "#e41a1c", "Noradrenergic Neuron" = "#4DAF4A"),
-"Genotype" = c("het" = "#7FC97F", "hom" = "#BEAED4"),
-"Sex" = c("female"="black","male"="gray70"),
-"Cluster" = c("1" = "#E41A1C", "2" = "#377EB8", "3" = "#4DAF4A", "4" = "#984EA3", "5" = "#FF7F00", "6" = "#FFFF33", "7" = "#A65628", "8" = "#F781BF", "9" = "#999999"))
+"Cell Type" =  c("Neuron" = "#E69F00", "Transition Cell" = "#56B4E9", "Acetylcholinergic Neuron" = "#009E73", "Noradrenergic Neuron" = "#F0E442", "Nitrergic Neuron" = "#0072B2"),
+"Cluster" = c("1" = "#F8766D", "2" = "#CD9600", "3" = "#7CAE00", "4" = "#00BE67", "5" = "#00BFC4", "6" = "#00A9FF", "7" = "#C77CFF", "8" = "#FF61CC"),
+"Genotype" = c("het" = "#e41a1c", "hom" = "#377eb8")
+)
 
-colnames(heatmap_annotation) <- c("Cell Type", "Genotype", "Sex", "Cluster")
+colnames(heatmap_annotation) <- c("Cell Type", "Genotype", "Cluster")
 
-pdf("Heatmap_neurons_wrt_genotype.pdf", height = 22, width = 17)
+#pdf("Heatmap_neurons_wrt_genotype.pdf", height = 22, width = 17)
 pheatmap(mat = heatmap_data,
          scale = "none",
          show_rownames = TRUE,
          show_colnames = FALSE,
          drop_levels = FALSE,
-         #breaks = seq(myLower, myUpper, length = 100),
+#         breaks = seq(myLower, myUpper, length = 100),
          annotation_col = heatmap_annotation,
          annotation_colors = heatmap_colors,
          annotation_names_col = TRUE,
          annotation_legend = TRUE,
          border_color = NA,
-         main = "Neurons\n84 Genes, 1% FDR\nFull model: ~ genotype + final_celltype + sex + batch\nReduced model: ~ final_celltype + sex + batch"
+treeheight_row = 0,
+treeheight_col = 0
+#         main = "Neurons\n84 Genes, 1% FDR\nFull model: ~ genotype + final_celltype + sex + batch\nReduced model: ~ final_celltype + sex + batch"
          )
-dev.off()
+#dev.off()
 
 neuron_genotype_gene_names <- lookupGeneName(dat.filtered, neuron_genotype_diff_test_sigGenes)
 
@@ -116,6 +85,17 @@ neuron_upregulated_in_het <- names(neuron_genotype_relative_exprs[neuron_genotyp
 neuron_downregulated_in_het <- names(neuron_genotype_relative_exprs[neuron_genotype_relative_exprs < 1])
 
 egENSEMBL <- toTable(org.Mm.egENSEMBL)
+
+neuron_all_entrez <- gsub("\\..*","", neuron_genotype_diff_test_sigGenes)
+m<-match(neuron_all_entrez,egENSEMBL$ensembl_id)
+neuron_all_entrez <- egENSEMBL$gene_id[m]
+ego_neuron_all <- enrichGO(gene = neuron_all_entrez,
+                OrgDb =       'org.Mm.eg.db',
+                ont           = "BP",
+                pAdjustMethod = "BH",
+                pvalueCutoff  = 0.05,
+                qvalueCutoff  = 1, 
+                readable      = TRUE)
 
 neuron_upregulated_in_het_entrez <- gsub("\\..*","", neuron_upregulated_in_het)
 m<-match(neuron_upregulated_in_het_entrez,egENSEMBL$ensembl_id)
@@ -140,139 +120,52 @@ ego_neuron_downregulated <- enrichGO(gene = neuron_downregulated_in_het_entrez,
                 readable      = TRUE)
 ```
 
-# Genotype:sex differential test
-```{r}
-neuron_genotype_sex_diff_test <-  differentialGeneTest(dat.neurons[neuron_expressed_genes,], fullModelFormulaStr = "~batch + final_celltype + genotype*sex", reducedModelFormulaStr = "~batch + final_celltype + genotype + sex", cores=detectCores()-1)
-
-neuron_genotype_sex_diff_test_sorted <- neuron_genotype_sex_diff_test[order(neuron_genotype_sex_diff_test$qval),]
-
-neuron_genotype_sex_diff_test_sigGenes <- rownames(neuron_genotype_sex_diff_test_sorted[neuron_genotype_sex_diff_test_sorted$qval < 0.01,])
-
-tmp <- t(scale(t(exprs(dat.neurons[neuron_genotype_sex_diff_test_sigGenes,])),scale = T, center = T))
-heatmap_data <- log(tmp - min(tmp) + 1)
-
-myLower <- (0)
-myUpper <- (2.3)
-
-heatmap_data[heatmap_data < myLower] <- myLower
-heatmap_data[heatmap_data > myUpper] <- myUpper
-
-rownames(heatmap_data) <- lookupGeneName(dat.neurons, rownames(heatmap_data))
-
-heatmap_annotation <- pData(dat.neurons)[,c("final_celltype","genotype","sex","cluster")]
-
-heatmap_colors <- list(
-"Cell Type" =  c("Neuron" = "#377eb8", "Transition Cell" = "#FF7F00", "Acetylcholinergic Neuron" = "#e41a1c", "Noradrenergic Neuron" = "#4DAF4A"),
-"Genotype" = c("het" = "#7FC97F", "hom" = "#BEAED4"),
-"Sex" = c("female"="black","male"="gray70"),
-"Cluster" = c("1" = "#E41A1C", "2" = "#377EB8", "3" = "#4DAF4A", "4" = "#984EA3", "5" = "#FF7F00", "6" = "#FFFF33", "7" = "#A65628", "8" = "#F781BF", "9" = "#999999"))
-
-colnames(heatmap_annotation) <- c("Cell Type", "Genotype", "Sex", "Cluster")
-
-pdf("Heatmap_neurons_wrt_genotype.pdf", height = 22, width = 17)
-pheatmap(mat = heatmap_data,
-         scale = "none",
-         show_rownames = TRUE,
-         show_colnames = FALSE,
-         drop_levels = FALSE,
-         #breaks = seq(myLower, myUpper, length = 100),
-         annotation_col = heatmap_annotation,
-         annotation_colors = heatmap_colors,
-         annotation_names_col = TRUE,
-         annotation_legend = TRUE,
-         border_color = NA,
-         main = "Neurons\n84 Genes, 1% FDR\nFull model: ~ genotype + final_celltype + sex + batch\nReduced model: ~ final_celltype + sex + batch"
-         )
-dev.off()
-```
-
 ### Differential test WRT cluster
 ```{r}
-plotUMAP(dat.filtered, color = "cluster") +
-  scale_color_manual("Cluster", values = colorRampPalette(brewer.pal(7, "Set1"))(11)[c(4:6, 1, 7:9, 2, 3, 10, 11)], guide = guide_legend(ncol=3)) +
-  theme_classic() +
-  theme(legend.position = c(0.8, 0.2), aspect.ratio = 1, legend.direction = "vertical")
-
-plotUMAP(dat.filtered[,pData(dat.filtered)$cluster %in% c(4, 9)], color = "cluster") + 
-  scale_color_brewer("Cluster", palette = "Set1") +
-  theme_classic() +
-  theme(legend.position = "bottom", aspect.ratio = 1)
-
-bifurcation_diff_test <- differentialGeneTest(dat.filtered[expressed_genes,pData(dat.filtered)$cluster %in% c(4, 9)], fullModelFormulaStr = "~batch + sex + genotype + final_celltype + cluster", reducedModelFormulaStr = "~batch + sex + genotype + final_celltype", cores = detectCores()-1)
+bifurcation_diff_test <- differentialGeneTest(dat.neurons[expressed_genes,pData(dat.neurons)$cluster %in% c(4:6)], fullModelFormulaStr = "~batch + sex + genotype + final_celltype + cluster", reducedModelFormulaStr = "~batch + sex + genotype + final_celltype", cores = detectCores() - 1)
 
 bifurcation_diff_test_sorted <- bifurcation_diff_test[order(bifurcation_diff_test$qval),]
 
-sig_genes <- bifurcation_diff_test_sorted[bifurcation_diff_test_sorted$qval < 0.01, c("gene_short_name")]
+bifurcation_diff_test_sigGenes <- rownames(bifurcation_diff_test_sorted[bifurcation_diff_test_sorted$qval < 0.01,])
 
-to_plot <- c("Gal", "Cartpt", "Etv1", "Vip", "Th", "Gfra1", "Npy")
-bifurcation_expr <- exprs(dat.filtered[lookupGeneId(dat.filtered, to_plot), pData(dat.filtered)$cluster %in% c(4, 9)])
-bifurcation_expr <- t(bifurcation_expr)
-tmp_df <- merge(bifurcation_expr, pData(dat.filtered)[pData(dat.filtered)$cluster %in% c(4, 9), "cluster", drop = F], by = 0)
-row.names(tmp_df) <- tmp_df[,1]
-tmp_df <- tmp_df[,-1]
-melted_df <- melt(tmp_df)
+tmp <- t(scale(t(exprs(dat.neurons[bifurcation_diff_test_sigGenes,pData(dat.neurons)$cluster %in% c(4:6)])), scale = T, center = T))
+heatmap_data <- log(tmp -min(tmp) + 1)
 
-ggplot(melted_df) +
-  geom_col(aes(x = variable, y = log10(value + 1), fill = cluster), position = "dodge") +
-  scale_fill_manual("Cluster", values = c("#E41A1C", "#3B87A2")) + 
-  scale_x_discrete(labels = lookupGeneName(dat.filtered, as.character(melted_df$variable))) +
-  scale_y_continuous("Log10(CPC + 1)", expand = c(0, 0)) +
-  theme(axis.title.x = element_blank(), legend.position = c(0.8, 0.9))
+#myLower<-(0)
+#myUpper<-(2.3)
 
+#heatmap_data[heatmap_data<myLower]<-myLower
+#heatmap_data[heatmap_data>myUpper]<-myUpper
 
-neuron_cluster_diff_test <-  differentialGeneTest(dat.neurons[neuron_expressed_genes,], fullModelFormulaStr = "~batch + Cluster", reducedModelFormulaStr = "~batch", cores=detectCores()-1)
+rownames(heatmap_data) <- lookupGeneName(dat.neurons, rownames(heatmap_data))
 
-neuron_cluster_diff_test_sorted <- neuron_cluster_diff_test[order(neuron_cluster_diff_test$pval),]
+heatmap_annotation <- pData(dat.neurons)[, c("final_celltype", "genotype", "cluster")]
 
-fold_change <- esApply(dat.neurons[neuron_expressed_genes,pData(dat.neurons)$genotype == "hom"], 1, mean)/esApply(dat.neurons[neuron_expressed_genes,pData(dat.neurons)$genotype == "het"], 1, mean)
+heatmap_colors <- list(
+"Cell Type" =  c("Neuron" = "#E69F00", "Transition Cell" = "#56B4E9", "Acetylcholinergic Neuron" = "#009E73", "Noradrenergic Neuron" = "#F0E442", "Nitrergic Neuron" = "#0072B2"),
+"Cluster" = c("4" = "#F8766D", "5" = "#00BA38", "6" = "#619CFF"),
+"Genotype" = c("het" = "#e41a1c", "hom" = "#377eb8")
+)
 
-neuron_cluster_diff_test_merged <- merge(neuron_cluster_diff_test_sorted, as.data.frame(fold_change), by = 0)
+colnames(heatmap_annotation) <- c("Cell Type", "Genotype", "Cluster")
 
-ggplot(neuron_cluster_diff_test_merged) +
-   geom_histogram(aes(x=pval))
-
-ggplot(neuron_cluster_diff_test_merged) +
-  geom_point(aes(y = -log10(pval), x=log10(fold_change), color = ifelse((log2(fold_change) > 2 | log2(fold_change) < -2) & -log10(pval) > 5, "significant","n.s.")))
-
-neuron_cluster_diff_test_merged[(log2(neuron_cluster_diff_test_merged$fold_change) > 2 | log2(neuron_cluster_diff_test_merged$fold_change) < -2) & -log10(neuron_cluster_diff_test_merged$pval) > 5,]
-
-neuron_cluster_diff_test_sigGenes <- neuron_cluster_diff_test_merged[(log2(neuron_cluster_diff_test_merged$fold_change) > 2 | log2(neuron_cluster_diff_test_merged$fold_change) < -2) & !neuron_cluster_diff_test_merged$fold_change == 0 & neuron_cluster_diff_test_merged$pval < .05/length(neuron_expressed_genes),"Row.names"]
-
-tmp<-t(scale(t(exprs(dat.neurons[neuron_cluster_diff_test_sigGenes,])),scale=T,center=T))
-heatmap_data<-log(tmp -min(tmp) + 1)
-
-myLower<-(0)
-myUpper<-(2.3)
-
-heatmap_data[heatmap_data<myLower]<-myLower
-heatmap_data[heatmap_data>myUpper]<-myUpper
-
-rownames(heatmap_data)<-lookupGeneName(dat.neurons,rownames(heatmap_data))
-
-heatmap_annotation<-pData(dat.neurons)[,c("final_celltype","genotype","sex","Cluster")]
-
-heatmap_colors<-list(
-"Cell Type" =  c("Acetylcholinergic Neuron"="#377eb8", "Ambiguous"="#999999", "Neuron"="#e41a1c", "Noradrenergic Neuron"="#984ea3"),
-"Genotype" = c("het" = "#7FC97F", "hom" = "#BEAED4"),
-"Sex" = c("female"="black","male"="gray70"),
-"Cluster" = c("1" = "#E41A1C", "2" = "#377EB8", "3" = "#4DAF4A", "4" = "#984EA3", "5" = "#FF7F00", "6" = "#FFFF33", "7" = "#A65628", "1" = "#F781BF", "2" = "#999999"))
-
-colnames(heatmap_annotation)<-c("Cell Type","Genotype","Sex","Cluster")
-
-pdf("Heatmap_neurons_wrt_cluster.pdf",height=10,width=17)
+#pdf("Heatmap_neurons_wrt_cluster.pdf",height=10,width=17)
 pheatmap(mat = heatmap_data,
          scale="none",
          show_rownames=TRUE,
          show_colnames=FALSE,
          drop_levels=FALSE,
-         breaks=seq(myLower,myUpper,length=100),
+ #        breaks=seq(myLower,myUpper,length=100),
          annotation_col=heatmap_annotation,
          annotation_colors=heatmap_colors,
          annotation_names_col=TRUE,
          annotation_legend=TRUE,
-         border_color = NA
+         border_color = NA,
+ treeheight_row = 0,
+ treeheight_col = 0,
+ fontsize_row = 4
          )
-dev.off()
+#dev.off()
 ```
 
 ##################
@@ -282,48 +175,10 @@ dev.off()
 ```{r glia_gene_selection}
 dat.glia <- dat.filtered[, pData(dat.filtered)$final_celltype %in% c("Progenitor/Glia")]
 # 588 cells
-
-fData(dat.glia)$num_cells_expressed <- rowSums(exprs(dat.glia) > 0)
-fData(dat.glia)$mean_expr <- esApply(dat.glia, 1, function(x){mean(x)})
-fData(dat.glia)$sd_expr <- esApply(dat.glia, 1, function(x){sd(x)})
-fData(dat.glia)$bcv <- 
-  (fData(dat.glia)$sd_expr/fData(dat.glia)$mean_expr)**2
-fData(dat.glia)$percent_detection <- 
-  (fData(dat.glia)$num_cells_expressed/dim(dat.glia)[2])*100
-
-glia_expressed_genes <- rownames(fData(dat.glia)[fData(dat.glia)$num_cells_expressed > 10 &fData(dat.glia)$sd_expr > 1e-20,])
-#Expressed in at least 10 cells at > 0 CPC with SD > 0
-#14088 genes
-```
-
-# Normalization by sequencing depth
-```{r normalize_by_read_depth_glia}
-# sum across expressed genes for each cell and divide all gene values by sum to normalize by read depth
-dat.glia.expressed <- dat.glia[glia_expressed_genes,]
-dat.glia.expressed.normalized <- dat.glia.expressed
-exprs(dat.glia.expressed.normalized) <- apply(exprs(dat.glia.expressed), 2, function(x){x/sum(x)})*1e+5
-
-fData(dat.glia.expressed.normalized)$sd_expr <- esApply(dat.glia.expressed.normalized, 1, function(x){sd(x)})
-```
-
-```{r glia_PCA}
-glia.pca <- prcomp(t(log10(exprs(dat.glia[glia_expressed_genes,]) + 1)), center = T)
-
-ggbiplot(glia.pca, var.axes = F, groups = pData(dat.glia)$batch, ellipse = T) + 
-  scale_color_brewer(palette = "Set1") + 
-  ggtitle("Batch") + 
-  theme(aspect.ratio = 1)
-
-glia.pca.unsup_genes <- prcomp(t(log10(exprs(dat.glia[unsup_clustering_expressed_genes.glia,]) + 1)), scale = T, center = T)
-
-ggbiplot(glia.pca.unsup_genes, var.axes = F, groups = pData(dat.glia)$batch, ellipse = T) + 
-  scale_color_brewer(palette = "Set1") + 
-  ggtitle("Batch") + 
-  theme(aspect.ratio = 1)
 ```
 
 ```{r glia_DE_wrt_genotype}
-glia_genotype_diff_test <- differentialGeneTest(dat.glia[glia_expressed_genes,], fullModelFormulaStr = "~batch + sex + final_celltype +genotype", reducedModelFormulaStr = "~batch + sex + final_celltype", cores = detectCores()-1)
+glia_genotype_diff_test <- differentialGeneTest(dat.glia[expressed_genes,], fullModelFormulaStr = "~batch + sex + genotype", reducedModelFormulaStr = "~batch + sex", cores = detectCores()-1)
 
 glia_genotype_diff_test_sorted <- glia_genotype_diff_test[order(glia_genotype_diff_test$qval),]
 
@@ -374,27 +229,7 @@ pheatmap(mat = heatmap_data,
          #main = "Neurons\n84 Genes, 1% FDR\nFull model: ~ genotype + final_celltype + sex + batch\nReduced model: ~ final_celltype + sex + batch"
          )
 dev.off()
-```
 
-```{r GOenrichment}
-library(org.Mm.eg.db)
-library(clusterProfiler)
-egENSEMBL <- toTable(org.Mm.egENSEMBL)
-
-#All DEG
-glia_genotype_diff_test_sigGenes_entrez <- gsub("\\..*","",glia_genotype_diff_test_sigGenes)
-m<-match(glia_genotype_diff_test_sigGenes_entrez,egENSEMBL$ensembl_id)
-glia_genotype_diff_test_sigGenes_entrez <- egENSEMBL$gene_id[m]
-ego <- enrichGO(gene = glia_genotype_diff_test_sigGenes_entrez,
-                OrgDb =       'org.Mm.eg.db',
-                ont           = "BP",
-                pAdjustMethod = "none",
-                qvalueCutoff  = 0.01,
-                pvalueCutoff  = 1, 
-                readable      = TRUE)
-
-
-# Subset by direction of change
 glia_het_means <- apply(exprs(dat.glia)[glia_genotype_diff_test_sigGenes, pData(dat.glia)$genotype == "het"], 1, mean)
 glia_hom_means <- apply(exprs(dat.glia)[glia_genotype_diff_test_sigGenes,pData(dat.glia)$genotype == "hom"], 1,mean)
 
@@ -404,7 +239,18 @@ glia_upregulated_in_het <- names(glia_genotype_relative_exprs[glia_genotype_rela
 
 glia_downregulated_in_het <- names(glia_genotype_relative_exprs[glia_genotype_relative_exprs < 1])
 
+egENSEMBL <- toTable(org.Mm.egENSEMBL)
 
+glia_all_entrez <- gsub("\\..*", "", glia_genotype_diff_test_sigGenes)
+m <- match(glia_all_entrez, egENSEMBL$ensembl_id)
+glia_all_entrez <- egENSEMBL$gene_id[m]
+ego_glia_all <- enrichGO(gene = glia_all_entrez,
+                OrgDb =       'org.Mm.eg.db',
+                ont           = "BP",
+                pAdjustMethod = "none",
+                qvalueCutoff  = 1,
+                pvalueCutoff  = 0.05, 
+                readable      = TRUE)
 
 glia_upregulated_in_het_entrez <- gsub("\\..*", "", glia_upregulated_in_het)
 m <- match(glia_upregulated_in_het_entrez, egENSEMBL$ensembl_id)
@@ -413,8 +259,8 @@ ego_glia_upregulated <- enrichGO(gene = glia_upregulated_in_het_entrez,
                 OrgDb =       'org.Mm.eg.db',
                 ont           = "BP",
                 pAdjustMethod = "none",
-                qvalueCutoff  = 0.01,
-                pvalueCutoff  = 1, 
+                qvalueCutoff  = 1,
+                pvalueCutoff  = 0.05, 
                 readable      = TRUE)
 
 glia_downregulated_in_het_entrez <- gsub("\\..*", "", glia_downregulated_in_het)
@@ -424,10 +270,177 @@ ego_glia_downregulated <- enrichGO(gene = glia_downregulated_in_het_entrez,
                 OrgDb =       'org.Mm.eg.db',
                 ont           = "BP",
                 pAdjustMethod = "none",
-                qvalueCutoff  = 0.01,
-                pvalueCutoff  = 1, 
+                qvalueCutoff  = 1,
+                pvalueCutoff  = 0.05, 
+                readable      = TRUE)
+```
+
+
+```{r}
+length(ego_neuron_all$ID)
+length(ego_glia_all$ID)
+sum(ego_neuron_all$ID %in% ego_glia_all$ID)
+
+ego_neuron_all[!ego_neuron_all$ID %in% ego_glia_all$ID,]
+
+length(ego_neuron_upregulated$ID)
+length(ego_glia_upregulated$ID)
+sum(ego_neuron_upregulated$ID %in% ego_glia_upregulated$ID)
+
+length(ego_neuron_downregulated$ID)
+length(ego_glia_downregulated$ID)
+sum(ego_neuron_downregulated$ID %in% ego_glia_downregulated$ID)
+
+length(neuron_genotype_diff_test_sigGenes)
+length(glia_genotype_diff_test_sigGenes)
+sum(neuron_genotype_diff_test_sigGenes %in% glia_genotype_diff_test_sigGenes)
+
+neuron_specific_DEG <- neuron_genotype_diff_test_sigGenes[!neuron_genotype_diff_test_sigGenes %in% glia_genotype_diff_test_sigGenes] #64
+
+glia_specific_DEG <- glia_genotype_diff_test_sigGenes[!glia_genotype_diff_test_sigGenes %in% neuron_genotype_diff_test_sigGenes] #206
+
+neuron_specific_entrez <- gsub("\\..*", "", neuron_specific_DEG)
+m <- match(neuron_specific_entrez, egENSEMBL$ensembl_id)
+neuron_specific_entrez <- egENSEMBL$gene_id[m]
+ego_neuron_specific <- enrichGO(gene = neuron_specific_entrez,
+                OrgDb =       'org.Mm.eg.db',
+                ont           = "BP",
+                pAdjustMethod = "none",
+                qvalueCutoff  = 1,
+                pvalueCutoff  = 0.05, 
                 readable      = TRUE)
 
+het_means <- apply(exprs(dat.neurons)[neuron_specific_DEG, pData(dat.neurons)$genotype == "het"], 1, mean)
+hom_means <- apply(exprs(dat.neurons)[neuron_specific_DEG, pData(dat.neurons)$genotype == "hom"], 1,mean)
+relative_exprs <- het_means/hom_means
+upregulated_in_het <- names(relative_exprs[relative_exprs > 1 | relative_exprs == "Inf"])
+downregulated_in_het <- names(relative_exprs[relative_exprs < 1])
+
+neuron_specific_upregulated_in_het_entrez <- gsub("\\..*", "", upregulated_in_het)
+m <- match(neuron_specific_upregulated_in_het_entrez, egENSEMBL$ensembl_id)
+neuron_specific_upregulated_in_het_entrez <- egENSEMBL$gene_id[m]
+ego_neuron_specific_upregulated <- enrichGO(gene = neuron_specific_upregulated_in_het_entrez,
+                OrgDb =       'org.Mm.eg.db',
+                ont           = "BP",
+                pAdjustMethod = "none",
+                qvalueCutoff  = 1,
+                pvalueCutoff  = 0.05, 
+                readable      = TRUE)
+
+neuron_specific_downregulated_in_het_entrez <- gsub("\\..*", "", downregulated_in_het)
+m <- match(neuron_specific_downregulated_in_het_entrez, egENSEMBL$ensembl_id)
+neuron_specific_downregulated_in_het_entrez <- egENSEMBL$gene_id[m]
+ego_neuron_specific_downregulated <- enrichGO(gene = neuron_specific_downregulated_in_het_entrez,
+                OrgDb =       'org.Mm.eg.db',
+                ont           = "BP",
+                pAdjustMethod = "none",
+                qvalueCutoff  = 1,
+                pvalueCutoff  = 0.05, 
+                readable      = TRUE)
+
+
+
+heatmap_annotation <- pData(dat.neurons)[, c("genotype", "cluster")]
+
+heatmap_colors <- list(
+"Genotype" = c("het" = "#E41A1C", "hom" = "#377EB8"),
+"Cluster" = c("1" = "#E41A1C", "2" = "#377EB8", "3" = "#4DAF4A", "4" = "#984EA3", "5" = "#FF7F00", "6" = "#FFFF33")
+)
+
+colnames(heatmap_annotation) <- c("Genotype", "Cluster")
+#heatmap_annotation <- heatmap_annotation %>%
+#  select("Genotype","Cluster","Sex","Cell Type") #order the columns
+
+tmp <- t(scale(t(exprs(dat.neurons[neuron_specific_DEG,])), scale = T, center = T))
+heatmap_data <- log(tmp -min(tmp) + 1)
+rownames(heatmap_data) <- lookupGeneName(dat.neurons, rownames(heatmap_data))
+
+pheatmap(mat = heatmap_data,
+         scale = "none",
+         show_rownames = TRUE,
+         show_colnames = FALSE,
+         drop_levels = FALSE,
+         annotation_col = heatmap_annotation,
+         annotation_colors = heatmap_colors,
+         annotation_names_col = TRUE,
+         annotation_legend = TRUE,
+         border_color = NA,
+         fontsize = 8,
+         treeheight_col = 0
+         )
+
+############
+
+glia_specific_entrez <- gsub("\\..*", "", glia_specific_DEG)
+m <- match(glia_specific_entrez, egENSEMBL$ensembl_id)
+glia_specific_entrez <- egENSEMBL$gene_id[m]
+ego_glia_specific <- enrichGO(gene = glia_specific_entrez,
+                OrgDb =       'org.Mm.eg.db',
+                ont           = "BP",
+                pAdjustMethod = "none",
+                qvalueCutoff  = 1,
+                pvalueCutoff  = 0.05, 
+                readable      = TRUE)
+
+het_means <- apply(exprs(dat.glia)[glia_specific_DEG, pData(dat.glia)$genotype == "het"], 1, mean)
+hom_means <- apply(exprs(dat.glia)[glia_specific_DEG, pData(dat.glia)$genotype == "hom"], 1,mean)
+relative_exprs <- het_means/hom_means
+upregulated_in_het <- names(relative_exprs[relative_exprs > 1 | relative_exprs == "Inf"])
+downregulated_in_het <- names(relative_exprs[relative_exprs < 1])
+
+glia_specific_upregulated_in_het_entrez <- gsub("\\..*", "", upregulated_in_het)
+m <- match(glia_specific_upregulated_in_het_entrez, egENSEMBL$ensembl_id)
+glia_specific_upregulated_in_het_entrez <- egENSEMBL$gene_id[m]
+ego_glia_specific_upregulated <- enrichGO(gene = glia_specific_upregulated_in_het_entrez,
+                OrgDb =       'org.Mm.eg.db',
+                ont           = "BP",
+                pAdjustMethod = "none",
+                qvalueCutoff  = 1,
+                pvalueCutoff  = 0.05, 
+                readable      = TRUE)
+
+glia_specific_downregulated_in_het_entrez <- gsub("\\..*", "", downregulated_in_het)
+m <- match(glia_specific_downregulated_in_het_entrez, egENSEMBL$ensembl_id)
+glia_specific_downregulated_in_het_entrez <- egENSEMBL$gene_id[m]
+ego_glia_specific_downregulated <- enrichGO(gene = glia_specific_downregulated_in_het_entrez,
+                OrgDb =       'org.Mm.eg.db',
+                ont           = "BP",
+                pAdjustMethod = "none",
+                qvalueCutoff  = 1,
+                pvalueCutoff  = 0.05, 
+                readable      = TRUE)
+
+
+
+
+
+heatmap_annotation <- pData(dat.glia)[, c("genotype", "cluster")]
+
+heatmap_colors <- list(
+"Genotype" = c("het" = "#E41A1C", "hom" = "#377EB8"),
+"Cluster" = c("1" = "#E41A1C", "2" = "#377EB8", "3" = "#4DAF4A", "5" = "#FF7F00", "6" = "#FFFF33", "7" = "#A65628")
+)
+
+colnames(heatmap_annotation) <- c("Genotype","Cluster")
+
+tmp <- t(scale(t(exprs(dat.glia[glia_specific_DEG,])), scale = T, center = T))
+heatmap_data <- log(tmp -min(tmp) + 1)
+rownames(heatmap_data) <- lookupGeneName(dat.glia, rownames(heatmap_data))
+
+pheatmap(mat = heatmap_data,
+         scale = "none",
+         show_rownames = TRUE,
+         show_colnames = FALSE,
+         drop_levels = FALSE,
+         annotation_col = heatmap_annotation,
+         annotation_colors = heatmap_colors,
+         annotation_names_col = TRUE,
+         annotation_legend = TRUE,
+         border_color = NA,
+         fontsize = 8,
+#         fontsize_row = 8,
+         treeheight_col = 0
+         )
 
 ```
 

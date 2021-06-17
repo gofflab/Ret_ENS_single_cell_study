@@ -19,80 +19,907 @@ assigned <- scran::cyclone(sce, pairs=mm.pairs)
 rownames(assigned$scores) <- rownames(pData(dat.filtered))
 pData(dat.filtered) <- cbind(pData(dat.filtered), assigned$scores)
 
-ggplot(tmp) +
-  geom_point(aes(x = UMAP1, y = UMAP2, color = S))
+p1 <- ggplot(pData(dat.filtered), aes(x = UMAP1, y = UMAP2, color = G1)) +
+  geom_point(size = 0.1) +
+  ggtitle("G1") +
+  scale_color_viridis("Probability", limits = c(0, 1), breaks = c(0, 0.5, 1)) +
+  theme(plot.title = element_text(size = 10, face = "plain", hjust = 0.02, margin = margin(b = -8)),
+        strip.background = element_blank(), 
+        strip.text = element_blank(), 
+        axis.title.x = element_text(size = 6, margin = margin(t = -2)),
+        axis.title.y = element_text(size = 6, margin = margin(r = -1)),
+        axis.text.x = element_text(size = 6, margin = margin(t = -2)),
+        axis.text.y = element_text(size = 6, margin = margin(r = -1)),
+        axis.ticks = element_blank(),
+        legend.position = "none",
+        aspect.ratio = 1
+        )
+ 
+p2 <- ggplot(pData(dat.filtered), aes(x = UMAP1, y = UMAP2, color = S)) +
+  geom_point(size = 0.1) +
+  ggtitle("S") +
+  scale_color_viridis("Probability", limits = c(0, 1), breaks = c(0, 0.5, 1)) +
+  theme(plot.title = element_text(size = 10, face = "plain", hjust = 0.02, margin = margin(b = -8)),
+        strip.background = element_blank(), 
+        strip.text = element_blank(), 
+        axis.title.x = element_text(size = 6, margin = margin(t = -2)),
+        axis.title.y = element_text(size = 6, margin = margin(r = -1)),
+        axis.text.x = element_text(size = 6, margin = margin(t = -2)),
+        axis.text.y = element_text(size = 6, margin = margin(r = -1)),
+        axis.ticks = element_blank(),
+        legend.position = "none",
+        aspect.ratio = 1
+        )
 
-
-p1 <- ggplot(tmp) +
-    geom_point(aes(x = UMAP1, y = UMAP2, color = G1)) +
-    scale_color_viridis(option = "plasma", limits = c(0, 1)) +
-    theme(aspect.ratio = 1, legend.position = "none") +
-    ggtitle("G1")
-p2 <- ggplot(tmp) +
-  geom_point(aes(x = UMAP1, y = UMAP2, color = S)) +
-  scale_color_viridis(option = "plasma", limits = c(0, 1)) +
-    theme(aspect.ratio = 1, legend.position = "none") +
-    ggtitle("S")
-p3 <- ggplot(tmp) +
-  geom_point(aes(x = UMAP1, y = UMAP2, color = G2M)) +
-  scale_color_viridis(option = "plasma", limits = c(0, 1)) +
-    theme(aspect.ratio = 1, legend.title = element_blank(), legend.position = c(0.8, 0.2)) +
-    ggtitle("G2/M")
+p3 <- ggplot(pData(dat.filtered), aes(x = UMAP1, y = UMAP2, color = G2M)) +
+  geom_point(size = 0.1) +
+  ggtitle("G2/M") +
+  scale_color_viridis("Probability", limits = c(0, 1), breaks = c(0, 0.5, 1)) +
+  theme(plot.title = element_text(size = 10, face = "plain", hjust = 0.02, margin = margin(b = -8)),
+        strip.background = element_blank(), 
+        strip.text = element_blank(), 
+        axis.title = element_text(size = 6),
+        axis.title.x = element_text(margin = margin(t = -2)),
+        axis.title.y = element_text(margin = margin(r = -1)),
+        axis.text = element_text(size = 6),
+        axis.text.x = element_text(margin = margin(t = -2)),
+        axis.text.y = element_text(margin = margin(r = -1)),
+        axis.ticks = element_blank(),
+        legend.background = element_blank(),
+        legend.title = element_text(size = 6),
+        legend.text = element_text(size =6),
+        legend.position = c(0.65, 0.25),
+        legend.key.size = unit(0.25, "cm"),
+        aspect.ratio = 1
+        ) 
 
 grid.arrange(p1, p2, p3, ncol = 3)
 
-p1 <- tmp %>%
-  mutate(group=paste(age, genotype)) %>%
-  ggplot(.) +
-  geom_density(aes(x = G1, color = group)) +
-  facet_wrap(~CellType, scales = "free_y") +
-  scale_color_manual(values = cbPalette[1:4]) +
-  theme(legend.position = "none") +
-  ggtitle("G1")
+p1 <- pData(dat.filtered)[pData(dat.filtered)$final_celltype == "Progenitor/Glia",] %>%
+  mutate(condition = paste(age, genotype)) %>%
+  ggplot(., aes(G1, color = condition)) + 
+  stat_ecdf(geom = "step") +
+  theme(aspect.ratio = 1, legend.position = "none", plot.title = element_blank()) +
+  labs(y = "Cumulative Density", x = "Probability(G1)") +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_x_continuous(expand = c(0, 0))
+
+p2 <- pData(dat.filtered)[pData(dat.filtered)$final_celltype == "Progenitor/Glia",] %>%
+  mutate(condition = paste(age, genotype)) %>%
+  ggplot(., aes(S, color = condition)) + 
+  stat_ecdf(geom = "step") +
+  theme(aspect.ratio = 1, legend.position = c(0.5, 0.25), plot.title = element_blank()) +
+  labs(x = "Probability(S)", y = "") +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_x_continuous(expand = c(0, 0))
+
+p3 <- pData(dat.filtered)[pData(dat.filtered)$final_celltype == "Progenitor/Glia",] %>%
+  mutate(condition = paste(age, genotype)) %>%
+  ggplot(., aes(G2M, color = condition)) + 
+  stat_ecdf(geom = "step") +
+  theme(aspect.ratio = 1, legend.position = "none", plot.title = element_blank()) +
+  labs(x = "Probability(G2M)", y = "") +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_x_continuous(expand = c(0, 0))
+
+a <- pData(dat.filtered)[pData(dat.filtered)$age == "E12.5" & pData(dat.filtered)$genotype == "het", "S"]
+
+b <- pData(dat.filtered)[pData(dat.filtered)$age == "E12.5" & pData(dat.filtered)$genotype == "hom", "G1"]
+
+c <- pData(dat.filtered)[pData(dat.filtered)$age == "E14.5" & pData(dat.filtered)$genotype == "het", "G2M"]
+
+d <- pData(dat.filtered)[pData(dat.filtered)$age == "E14.5" & pData(dat.filtered)$genotype == "hom", "G2M"]
+
+ks.test(a, d)
+
+grid.arrange(p1, p2, p3, ncol = 3)
+
+
+p1 <- pData(dat.filtered) %>%
+  mutate(condition = paste(age, genotype)) %>%
+  ggplot(., aes(G1, color = condition, lty = condition)) + 
+  stat_ecdf(geom = "step") +
+  labs(x = "Probability(G1)", y = "Cumulative Density") +
+  scale_y_continuous(expand = c(0, 0), breaks = c(0, 0.5, 1), labels = c("0", "0.5", "1")) +
+  scale_x_continuous(expand = c(0, 0), breaks = c(0, 0.5, 1), labels = c("0", "0.5", "1")) +
+  scale_color_manual("Age, Genotype", values = c("E12.5 het" = "#E41A1C", "E12.5 hom" = "#377EB8", "E14.5 het" = "#E41A1C", "E14.5 hom" = "#377EB8")) +
+  scale_linetype_manual("Age, Genotype", values = c("E12.5 het" = "solid", "E12.5 hom" = "solid", "E14.5 het" = "dotted", "E14.5 hom" = "dotted")) +
+  theme(aspect.ratio = 1, 
+        legend.position = "none", 
+        plot.title = element_blank(),
+        plot.margin = margin(0, 2, 0, 0),
+        axis.title = element_text(size = 8),
+        axis.title.y = element_text(margin = margin(r = 0)),
+        axis.title.x = element_text(margin = margin(t = -2)),
+        axis.text = element_text(size = 6)) +
+  coord_flip()
+
+p2 <- pData(dat.filtered) %>%
+  mutate(condition = paste(age, genotype)) %>%
+  ggplot(., aes(S, color = condition, lty = condition)) + 
+  stat_ecdf(geom = "step") +
+  labs(x = "Probability(S)", y = "Cumulative Density") +
+  scale_y_continuous(expand = c(0, 0), breaks = c(0, 0.5, 1), labels = c("0", "0.5", "1")) +
+  scale_x_continuous(expand = c(0, 0), breaks = c(0, 0.5, 1), labels = c("0", "0.5", "1"), limits = c(0, 1.001)) +
+  scale_color_manual("Age, Genotype", values = c("E12.5 het" = "#E41A1C", "E12.5 hom" = "#377EB8", "E14.5 het" = "#E41A1C", "E14.5 hom" = "#377EB8")) +
+  scale_linetype_manual("Age, Genotype", values = c("E12.5 het" = "solid", "E12.5 hom" = "solid", "E14.5 het" = "dotted", "E14.5 hom" = "dotted")) +
+  theme(aspect.ratio = 1, 
+        legend.position = "none", 
+        plot.title = element_blank(),
+        plot.margin = margin(0, 2, 0, 0),
+        axis.title = element_text(size = 8),
+        axis.title.y = element_text(margin = margin(r = 0)),
+        axis.title.x = element_text(margin = margin(t = -2)),
+        axis.text = element_text(size = 6)) +
+  coord_flip()
+
+p3 <- pData(dat.filtered) %>%
+  mutate(condition = paste(age, genotype)) %>%
+  ggplot(., aes(G2M, color = condition, lty = condition)) + 
+  stat_ecdf(geom = "step") +
+  labs(x = "Probability(G2/M)", y = "Cumulative Density") +
+  scale_y_continuous(expand = c(0, 0), breaks = c(0, 0.5, 1), labels = c("0", "0.5", "1")) +
+  scale_x_continuous(expand = c(0, 0), breaks = c(0, 0.5, 1), labels = c("0", "0.5", "1")) +
+  scale_color_manual("Age, Genotype", values = c("E12.5 het" = "#E41A1C", "E12.5 hom" = "#377EB8", "E14.5 het" = "#E41A1C", "E14.5 hom" = "#377EB8")) +
+  scale_linetype_manual("Age, Genotype", values = c("E12.5 het" = "solid", "E12.5 hom" = "solid", "E14.5 het" = "dotted", "E14.5 hom" = "dotted")) +
+  theme(aspect.ratio = 1, 
+        legend.position = c(0, 0.7), 
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 6),
+        plot.title = element_blank(),
+        plot.margin = margin(0, 2, 0, 0),
+        axis.title = element_text(size = 8),
+        axis.title.y = element_text(margin = margin(r = 0)),
+        axis.title.x = element_text(margin = margin(t = -2)),
+        axis.text = element_text(size = 6)) +
+  coord_flip()
+
+grid.arrange(p1, p2, p3, ncol = 3)
+
+pData(dat.filtered)$CC_phase <- c("G1", "S", "G2M")[apply(pData(dat.filtered)[,c("G1", "S", "G2M")], 1, which.max)]
+
+plotUMAP(dat.filtered, color = "CC_phase", size = 0.8) +
+  theme_classic() +
+  theme(aspect.ratio = 1, legend.position = c(0.8, 0.2))
+
+freqdat <- pData(dat.filtered) %>%
+  group_by(age, genotype,CC_phase) %>% 
+  count() %>%
+  group_by(age, genotype) %>%
+  mutate(freq = n/sum(n)) %>% 
+  mutate(condition = paste(genotype, CC_phase))
+
+ggplot(freqdat, aes(x = age, y = freq, group = condition, color = CC_phase, lty = genotype)) +
+  geom_line() +
+  geom_point() +
+  scale_color_brewer(palette = "Set1") +
+  scale_y_continuous(limits = c(0, 1), expand = c(0,0)) +
+  scale_x_discrete(expand = c(0.05, 0.05))
+
+
+tmp <- pData(dat.filtered)[,c("source_plate", "age", "genotype", "CC_phase")] %>%
+  mutate(condition = paste(age, genotype))
+tmp2 <- as.data.frame(table(tmp[,c("source_plate", "CC_phase")]))
+tmp3 <- merge(tmp2, unique(tmp[,c("source_plate", "condition")]), by = "source_plate")
+tmp3$condition <- as.factor(tmp3$condition)
+
+
+
+tmp <- melt(as.matrix(pData(dat.filtered)[,c("G1", "S", "G2M")]))
+tmp2 <- merge(tmp, pData(dat.filtered)[,c("age", "sex", "genotype")], by.x = "Var1", by.y = 0)
+
+CCmat <- matrix(NA, nrow = 3, ncol = 3)
+rownames(CCmat) <- c("G1", "S", "G2M")
+colnames(CCmat) <- c("genotype", "age", "sex")
+
+mean1mat <- matrix(NA, nrow = 3, ncol = 3)
+rownames(mean1mat) <- c("G1", "S", "G2M")
+colnames(mean1mat) <- c("genotype", "age", "sex")
+
+mean2mat <- matrix(NA, nrow = 3, ncol = 3)
+rownames(mean2mat) <- c("G1", "S", "G2M")
+colnames(mean2mat) <- c("genotype", "age", "sex")
+
+for(i in c("G1", "S", "G2M")){
+  res <- t.test(value ~ genotype, data = tmp2[tmp2$Var2 == i,])
+  CCmat[i,1] <- res$p.value
+  mean1mat[i,1] <- res$estimate[1]
+  mean2mat[i,1] <- res$estimate[2]
+}
+
+for(i in c("G1", "S", "G2M")){
+  res <- t.test(value ~ age, data = tmp2[tmp2$Var2 == i,])
+  CCmat[i,2] <- res$p.value
+  mean1mat[i,2] <- res$estimate[1]
+  mean2mat[i,2] <- res$estimate[2]
+}
+
+for(i in c("G1", "S", "G2M")){
+  res <- t.test(value ~ sex, data = tmp2[tmp2$Var2 == i,])
+  CCmat[i,3] <- res$p.value
+  mean1mat[i,3] <- res$estimate[1]
+  mean2mat[i,3] <- res$estimate[2]
+}
+
+
+CCmelt <- melt(CCmat)
+mean1melt <- melt(mean1mat)
+mean2melt <- melt(mean2mat)
+tmp <- merge(merge(CCmelt, mean1melt, by = c("Var1", "Var2"), sort = F), mean2melt, by = c("Var1", "Var2"), sort = F)
+colnames(tmp) <- c("CCphase", "var", "pvalue", "mean1", "mean2")
+
+tmp$sig <- ifelse(tmp$pvalue < 0.01/9, "**", #if
+       ifelse(tmp$pvalue < 0.05/9, "*", #else if
+       "n.s.")) #else
+
+
+tmp2 <- tmp2 %>% mutate(age.genotype = paste(age, genotype))
+
+fit.G1 <- aov(value ~ genotype*age, data = tmp2[tmp2$Var2 == "G1",])
+fit.S <- aov(value ~ genotype*age, data = tmp2[tmp2$Var2 == "S",])
+fit.G2M <- aov(value ~ genotype*age, data = tmp2[tmp2$Var2 == "G2M",])
+
+TukeyHSD(fit.G1)
+```
+
+
+```{r CC_patterns}
+CC_patterns <- list()
+CC_patterns$projection <- t(projection70$projection[paste0("Pattern_", 40:42),]) #Subset CC patterns
+CC_patterns$pval <- t(projection70$pval[paste0("Pattern_", 40:42),]) #Subset CC patterns
+
+
+CC_patterns$projection <- apply(CC_patterns$projection, 2, function(x){ #Normalize to [0,1]
+  x=x-min(x)
+  x=x/max(x)
+})
+
+CC_patterns$projection <- merge(pData(dat.filtered)[,c("cell_id", "UMAP1", "UMAP2", "age", "sex", "genotype")],
+                                CC_patterns$projection, 
+                                by.x = "cell_id", 
+                                by.y = 0)
+melted_CC_patterns_projection <- melt(CC_patterns$projection, 
+                                      id = c("cell_id", "UMAP1", "UMAP2", "age", "sex", "genotype"))
+melted_CC_patterns_projection$variable <- factor(melted_CC_patterns_projection$variable, levels = c("Pattern_40", "Pattern_41", "Pattern_42"))
+melted_CC_patterns_pval <- melt(CC_patterns$pval)
+melted_CC_patterns <- merge(melted_CC_patterns_projection, melted_CC_patterns_pval, by.x = c("cell_id", "variable"), by.y = c("Var1", "Var2"))
+colnames(melted_CC_patterns) <- c("cell_id", "pattern", "x", "y", "age", "sex", "genotype", "weight", "pval")
+
+phase <- c("Pattern_40" = "S", 
+       "Pattern_41" = "Early M", 
+       "Pattern_42" = "Late M")
+
+
+
+tmp <- merge(linnarsson_dat[,c("X", "Y","parentCellType")], linnarsson_gapsresult@sampleFactors[,40:42], by = 0)
+tmp <- melt(tmp, id.vars = c("Row.names", "X", "Y", "parentCellType"))
+names(tmp) <- c("cell_id", "x", "y", "subset", "pattern", "weight")
+tmp$significant <- TRUE
+
+melted_CC_patterns$significant <- melted_CC_patterns$pval < 0.05/nrow(pData(dat.filtered))
+melted_CC_patterns$subset <- "HD"
+tmp2 <- rbind(tmp, melted_CC_patterns[,names(tmp)])
+tmp2$subset <- factor(tmp2$subset, levels = c("glia", "neuron", "HD"))
+
+# CC pattern plots
+
+
+#40 = S
+p1 <- ggplot(tmp2[tmp2$pattern == "Pattern_40",]) +
+  geom_point(aes(x=x, y=y, 
+     color = weight), size = 0.1) +
+  ggtitle("Pattern 40\nS Phase") +
+  facet_wrap(~subset, scales = "free", ncol = 3) +
+  scale_color_viridis("Pattern weight", option = "inferno", guide = FALSE) +
+  scale_x_continuous("Reduced dimension 1") +
+  scale_y_continuous("Reduced dimension 2") +
+  theme(plot.title = element_text(size = 6, face = "plain", hjust = 0.01, margin = margin(b = -12)),
+        strip.background = element_blank(), 
+        strip.text = element_blank(), 
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(size = 6, margin = margin(r = -1)),
+        axis.text.x = element_blank(),
+        axis.text.y = element_text(size = 6, margin = margin(r = -1)),
+        axis.ticks = element_blank()
+        ) 
+
+#41 = G2M - Mitosis:Metaphase
+p2 <- ggplot(tmp2[tmp2$pattern == "Pattern_41",]) +
+  geom_point(aes(x=x, y=y, 
+     color = weight), size = 0.1) +
+  ggtitle("Pattern 41\n Early to Mid M Phase") +
+  facet_wrap(~subset, scales = "free", ncol = 3) +
+  scale_color_viridis("Pattern weight", option = "inferno", guide = FALSE) +
+  scale_x_continuous("Reduced dimension 1") +
+  scale_y_continuous("Reduced dimension 2") +
+  theme(plot.title = element_text(size = 6, face = "plain", hjust = 0.01, margin = margin(b = -18)),
+        strip.background = element_blank(), 
+        strip.text = element_blank(), 
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(size = 6, margin = margin(r = -1)),
+        axis.text.x = element_blank(),
+        axis.text.y = element_text(size = 6, margin = margin(r = -1)),
+        axis.ticks = element_blank()
+        ) 
+
+#42 = G2M - Mitosis:Anaphase/Telophase
+p3 <- ggplot(tmp2[tmp2$pattern == "Pattern_42",]) +
+  geom_point(aes(x=x, y=y, 
+     color = weight), size = 0.1) +
+  ggtitle("Pattern 42\nLate M Phase") +
+  facet_wrap(~subset, scales = "free", ncol = 3) +
+  scale_color_viridis("Pattern\nweight", option = "inferno", breaks = c(0, 1)) +
+  scale_x_continuous("Reduced dimension 1") +
+  scale_y_continuous("Reduced dimension 2") +
+  theme(plot.title = element_text(size = 6, face = "plain", hjust = 0.01, margin = margin(b = -18)),
+        strip.background = element_blank(), 
+        strip.text = element_blank(), 
+        axis.title = element_text(size = 6),
+        axis.title.x = element_text(margin = margin(t = -1)),
+        axis.title.y = element_text(margin = margin(r = -1)),
+        axis.text = element_text(size = 6),
+        axis.text.x = element_text(margin = margin(t = -1)),
+        axis.text.y = element_text(margin = margin(r = -1)),
+        axis.ticks = element_blank(),
+        legend.position = c(0.93, 0.28),
+        legend.background = element_blank(),
+        legend.key.height = unit(7, "pt"),
+        legend.key.width = unit(5, "pt"),
+        legend.text = element_text(size = 4),
+        legend.title = element_text(size = 6)
+        ) 
+
+pdf("CC_pattern_projections.pdf", width = 6, height = 5.5, useDingbats = F)
+grid.arrange(p1, p2, p3, ncol = 1)
+dev.off()
+
+
+p1 <- ggplot(tmp2[tmp2$pattern == "Pattern_40",]) +
+  geom_point(aes(x=x, y=y, 
+     color = ifelse(significant, weight, NA),
+     alpha = ifelse(significant, 1, 0.1)), size = 0.1) +
+  ggtitle("Pattern 40\nS Phase") +
+  facet_wrap(~subset, scales = "free", ncol = 3) +
+  scale_color_viridis("Pattern weight", option = "inferno", guide = FALSE) +
+  scale_alpha(guide = FALSE) +
+  scale_x_continuous("Reduced dimension 1") +
+  scale_y_continuous("Reduced dimension 2") +
+  theme(plot.title = element_text(size = 6, face = "plain", hjust = 0.01, margin = margin(b = -12)),
+        strip.background = element_blank(), 
+        strip.text = element_blank(), 
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(size = 6, margin = margin(r = -1)),
+        axis.text.x = element_blank(),
+        axis.text.y = element_text(size = 6, margin = margin(r = -1)),
+        axis.ticks = element_blank()
+        ) 
+ 
+p2 <- ggplot(tmp2[tmp2$pattern == "Pattern_41",]) +
+  geom_point(aes(x=x, y=y, 
+     color = ifelse(significant, weight, NA),
+     alpha = ifelse(significant, 1, 0.1)), size = 0.1) +
+  ggtitle("Pattern 41\nEarly to Mid M Phase") +
+  facet_wrap(~subset, scales = "free", ncol = 3) +
+  scale_color_viridis("Pattern weight", option = "inferno", guide = FALSE) +
+  scale_alpha(guide = FALSE) +
+  scale_x_continuous("Reduced dimension 1") +
+  scale_y_continuous("Reduced dimension 2") +
+  theme(plot.title = element_text(size = 6, face = "plain", hjust = 0.01, margin = margin(b = -12)),
+        strip.background = element_blank(), 
+        strip.text = element_blank(), 
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(size = 6, margin = margin(r = -1)),
+        axis.text.x = element_blank(),
+        axis.text.y = element_text(size = 6, margin = margin(r = -1)),
+        axis.ticks = element_blank()
+        ) 
+
+
+
+p3 <- ggplot(tmp2[tmp2$pattern == "Pattern_42",]) +
+  geom_point(aes(x=x, y=y, 
+     color = ifelse(significant, weight, NA),
+     alpha = ifelse(significant, 1, 0.1)), size = 0.1) +
+  ggtitle("Pattern 42\nLate M Phase") +
+  facet_wrap(~subset, scales = "free", ncol = 3) +
+  scale_color_viridis("Pattern\nweight", option = "inferno", breaks = c(0,1)) +
+  scale_alpha(guide = FALSE) +
+  scale_x_continuous("Reduced dimension 1") +
+  scale_y_continuous("Reduced dimension 2") +
+  theme(plot.title = element_text(size = 6, face = "plain", hjust = 0.01, margin = margin(b = -12)),
+        strip.background = element_blank(), 
+        strip.text = element_blank(),
+        axis.text = element_blank(), 
+        axis.ticks = element_blank(),
+        axis.title = element_text(size = 8),
+        axis.title.x = element_text(margin = margin(b = 0)),
+        axis.title.y = element_text(margin = margin(r = 0)),
+        legend.position = c(0.93, 0.28),
+        legend.background = element_blank(),
+        legend.key.height = unit(7, "pt"),
+        legend.key.width = unit(5, "pt"),
+        legend.text = element_text(size = 4),
+        legend.title = element_text(size = 6)
+        )
+
+pdf("CC_pattern_projections_significant.pdf", width = 6, height = 5.5, useDingbats = F)
+grid.arrange(p1, p2, p3, ncol = 1)
+dev.off()
+
+
+
+p1 <- ggplot(melted_CC_patterns) +
+  geom_point(aes(x=x, y=y, 
+                 color = pattern,
+                 alpha = weight), size = 0.4, shape = 16) +
+  facet_wrap(~pattern, scales = "free", ncol = 1, labeller = labeller(pattern = phase)) +
+  scale_x_continuous("UMAP 1") +
+  scale_y_continuous("UMAP2") +
+  scale_alpha(range = c(0,1)) +
+  #scale_color_viridis("Normalized\nProjection\nWeight", breaks = c(0,1)) +
+  scale_color_brewer(palette = "Dark2") +
+  theme(aspect.ratio = 1,
+        strip.text = element_text(margin = margin(b = 5)),
+        strip.background = element_blank(),
+        axis.title = element_text(size = 12),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        legend.position = "none"
+#        legend.position = c(1, 0.4),
+#        legend.title = element_text(size = 10),
+#        legend.text = element_text(size = 8),
+#        legend.key.height = unit(3,"mm"),
+#        legend.key.width = unit(3, "mm")
+  ) 
+
+m <- c("1" = "S",
+  "2" = "Early M",
+  "3" = "Late M")
+
+CC_patterns[["projection"]][,c("max_pattern", "max_value")] <- t(apply(CC_patterns[["projection"]][,paste0("Pattern_", 40:42)], 1, function(x){
+        c(m[which.max(x)], max(x))
+  }))
+
+CC_patterns[["projection"]][,"max_value"] <- as.numeric(CC_patterns[["projection"]][,"max_value"])
+
+CC_patterns[["projection"]][,"max_pattern"] <- factor(CC_patterns[["projection"]][,"max_pattern"], levels = c("S", "Early M", "Late M"))
+
+p2 <- ggplot(CC_patterns$projection) +
+  geom_point(aes(x=UMAP1, y=UMAP2, 
+                 color = max_pattern,
+                 alpha = max_value), size = 0.7,
+             shape = 16) +
+  scale_color_brewer(palette = "Dark2") +
+  scale_alpha(range = c(0,1)) +
+  ggtitle("Maximum Probability Map") +
+  theme(aspect.ratio = 1,
+        plot.title = element_text(face = "plain"),
+        axis.title = element_text(size = 12),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        legend.position = "none"
+  )
+
+pdf("CC_MPM.pdf", width = 4, height = 4, useDingbats = F)
+p2
+dev.off()
+
+
+p1 <- ggplot(tmp2[tmp2$pattern == "Pattern_40",]) +
+  geom_point(aes(x=x, 
+                 y=y,
+                 alpha = weight),
+             color = "#1B9E77",
+             size = 0.1) +
+  ggtitle("Pattern 40\nS Phase") +
+  facet_wrap(~subset, scales = "free", ncol = 3) +
+#  scale_color_gradient("Pattern weight", low = "#F1F1F1", high = "#1B9E77", guide = FALSE) +
+  scale_alpha(range = c(0,1), guide = F) +
+  scale_x_continuous("Reduced dimension 1") +
+  scale_y_continuous("Reduced dimension 2") +
+  theme(plot.title = element_text(size = 6, face = "plain", hjust = 0.01, margin = margin(b = -12)),
+        strip.background = element_blank(), 
+        strip.text = element_blank(), 
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(size = 6, margin = margin(r = -1)),
+        axis.text.x = element_blank(),
+        axis.text.y = element_text(size = 6, margin = margin(r = -1)),
+        axis.ticks = element_blank()
+        ) 
+
+p2 <- ggplot(tmp2[tmp2$pattern == "Pattern_41",]) +
+  geom_point(aes(x=x, 
+                 y=y,
+                 alpha = weight),
+             color = "#D95F02",
+             size = 0.1) +
+  ggtitle("Pattern 41\nEarly to Mid M Phase") +
+  facet_wrap(~subset, scales = "free", ncol = 3) +
+#  scale_color_viridis("Pattern weight", option = "inferno", guide = FALSE) +
+  scale_alpha(range = c(0,1), guide = F) +
+  scale_x_continuous("Reduced dimension 1") +
+  scale_y_continuous("Reduced dimension 2") +
+  theme(plot.title = element_text(size = 6, face = "plain", hjust = 0.01, margin = margin(b = -12)),
+        strip.background = element_blank(), 
+        strip.text = element_blank(), 
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(size = 6, margin = margin(r = -1)),
+        axis.text.x = element_blank(),
+        axis.text.y = element_text(size = 6, margin = margin(r = -1)),
+        axis.ticks = element_blank()
+        ) 
+
+p3 <- ggplot(tmp2[tmp2$pattern == "Pattern_42",]) +
+  geom_point(aes(x=x, 
+                 y=y,
+                 alpha = weight),
+             color = "#7570B3",
+             size = 0.1) +
+  ggtitle("Pattern 42\nLate M Phase") +
+  facet_wrap(~subset, scales = "free", ncol = 3) +
+  #scale_color_viridis("Pattern\nweight", option = "inferno", breaks = c(0, 1)) +
+  scale_alpha(range = c(0,1), guide = F) +
+  scale_x_continuous("Reduced dimension 1") +
+  scale_y_continuous("Reduced dimension 2") +
+  theme(plot.title = element_text(size = 6, face = "plain", hjust = 0.01, margin = margin(b = -12)),
+        strip.background = element_blank(), 
+        strip.text = element_blank(), 
+        axis.title = element_text(size = 6),
+        axis.title.x = element_text(margin = margin(t = -1)),
+        axis.title.y = element_text(margin = margin(r = -1)),
+        axis.text = element_text(size = 6),
+        axis.text.x = element_text(margin = margin(t = -1)),
+        axis.text.y = element_text(margin = margin(r = -1)),
+        axis.ticks = element_blank(),
+        legend.position = c(0.93, 0.28),
+        legend.background = element_blank(),
+        legend.key.height = unit(7, "pt"),
+        legend.key.width = unit(5, "pt"),
+        legend.text = element_text(size = 4),
+        legend.title = element_text(size = 6)
+        ) 
+
+pdf("CC_pattern_projections_v2.pdf", width = 6, height = 5.5, useDingbats = F)
+grid.arrange(p1, p2, p3, ncol = 1)
+dev.off()
+
+p1 <- ggplot(tmp2[tmp2$pattern == "Pattern_40" & tmp2$subset == "HD",]) +
+  geom_point(aes(x=x, 
+                 y=y,
+                 alpha = weight),
+             color = "#1B9E77",
+             size = 0.1) +
+  ggtitle("Pattern 40\nS Phase") +
+  scale_alpha(range = c(0,1), guide = F) +
+  scale_x_continuous("Reduced dimension 1") +
+  scale_y_continuous("Reduced dimension 2") +
+  theme(aspect.ratio = 1,
+        plot.title = element_text(size = 6, face = "plain", hjust = 0.01, margin = margin(b = -12)),
+        axis.title = element_text(size = 6),
+        axis.title.x = element_text(margin = margin(t = -1)),
+        axis.title.y = element_text(margin = margin(r = -1)),
+        axis.text = element_text(size = 6),
+        axis.text.x = element_text(margin = margin(t = -1)),
+        axis.text.y = element_text(margin = margin(r = -1)),
+        axis.ticks = element_blank()
+        ) 
+
+p2 <- ggplot(tmp2[tmp2$pattern == "Pattern_41" & tmp2$subset == "HD",]) +
+  geom_point(aes(x=x, 
+                 y=y,
+                 alpha = weight),
+             color = "#D95F02",
+             size = 0.1) +
+  ggtitle("Pattern 41\nEarly to Mid M Phase") +
+  scale_alpha(range = c(0,1), guide = F) +
+  scale_x_continuous("Reduced dimension 1") +
+  scale_y_continuous("Reduced dimension 2") +
+  theme(aspect.ratio = 1,
+        plot.title = element_text(size = 6, face = "plain", hjust = 0.01, margin = margin(b = -12)),
+        axis.title = element_text(size = 6),
+        axis.title.x = element_text(margin = margin(t = -1)),
+        axis.title.y = element_text(margin = margin(r = -1)),
+        axis.text = element_text(size = 6),
+        axis.text.x = element_text(margin = margin(t = -1)),
+        axis.text.y = element_text(margin = margin(r = -1)),
+        axis.ticks = element_blank()
+        ) 
+
+p3 <- ggplot(tmp2[tmp2$pattern == "Pattern_42" & tmp2$subset == "HD",]) +
+  geom_point(aes(x=x, 
+                 y=y,
+                 alpha = weight),
+             color = "#7570B3",
+             size = 0.1) +
+  ggtitle("Pattern 42\nLate M Phase") +
+  scale_alpha(range = c(0,1), guide = F) +
+  scale_x_continuous("Reduced dimension 1") +
+  scale_y_continuous("Reduced dimension 2") +
+  theme(aspect.ratio = 1,
+        plot.title = element_text(size = 6, face = "plain", hjust = 0.01, margin = margin(b = -12)),
+        strip.background = element_blank(), 
+        strip.text = element_blank(), 
+        axis.title = element_text(size = 6),
+        axis.title.x = element_text(margin = margin(t = -1)),
+        axis.title.y = element_text(margin = margin(r = -1)),
+        axis.text = element_text(size = 6),
+        axis.text.x = element_text(margin = margin(t = -1)),
+        axis.text.y = element_text(margin = margin(r = -1)),
+        axis.ticks = element_blank(),
+        legend.position = c(0.93, 0.28),
+        legend.background = element_blank(),
+        legend.key.height = unit(7, "pt"),
+        legend.key.width = unit(5, "pt"),
+        legend.text = element_text(size = 4),
+        legend.title = element_text(size = 6)
+        ) 
+
+pdf("CC_pattern_projections_v2_horizontal.pdf", width = 7, height = 2.5, useDingbats = F)
+grid.arrange(p1, p2, p3, nrow = 1)
+dev.off()
+
+
+p1 <- CC_patterns$projection %>%
+  mutate(condition = paste(age, genotype)) %>%
+  ggplot(., aes(Pattern_40, color = condition, lty = condition)) + 
+  stat_ecdf(geom = "step") +
+  ggtitle("Pattern 40") +
+  scale_y_continuous("Cumulative Density", expand = c(0, 0), breaks = c(0, 0.5, 1), labels = c("0", "0.5", "1")) +
+  scale_x_continuous("Pattern Weight", expand = c(0, 0), breaks = c(0, 0.5, 1), labels = c("0", "0.5", "1"), limits = c(0, 1.001)) +
+  scale_color_manual("Age, Genotype", values = c("E12.5 het" = "#E41A1C", "E12.5 hom" = "#377EB8", "E14.5 het" = "#E41A1C", "E14.5 hom" = "#377EB8")) +
+  scale_linetype_manual("Age, Genotype", values = c("E12.5 het" = "solid", "E12.5 hom" = "solid", "E14.5 het" = "dotted", "E14.5 hom" = "dotted")) +
+  theme(aspect.ratio = 1, 
+        legend.position = "none", 
+        plot.title = element_text(size = 10, face = "plain", hjust = 0.02, margin = margin(b = 0)),
+        plot.margin = margin(2, 2, 2, 2),
+        axis.title.y = element_text(size = 8, margin = margin(r = 0)),
+        axis.title.x = element_text(size = 8, margin = margin(t = -2)),
+        axis.text = element_text(size = 6)
+          )
+
+p2 <- CC_patterns$projection %>%
+  mutate(condition = paste(age, genotype)) %>%
+  ggplot(., aes(Pattern_41, color = condition, lty = condition)) + 
+  stat_ecdf(geom = "step") +
+  ggtitle("Pattern 41") +
+  scale_y_continuous("Cumulative Density", expand = c(0, 0), breaks = c(0, 0.5, 1), labels = c("0", "0.5", "1")) +
+  scale_x_continuous("Pattern Weigth", expand = c(0, 0), breaks = c(0, 0.5, 1), labels = c("0", "0.5", "1"), limits = c(0, 1.001)) +
+  scale_color_manual("Age, Genotype", values = c("E12.5 het" = "#E41A1C", "E12.5 hom" = "#377EB8", "E14.5 het" = "#E41A1C", "E14.5 hom" = "#377EB8")) +
+  scale_linetype_manual("Age, Genotype", values = c("E12.5 het" = "solid", "E12.5 hom" = "solid", "E14.5 het" = "dotted", "E14.5 hom" = "dotted")) +
+  theme(aspect.ratio = 1, 
+        legend.position = "none", 
+        plot.title = element_text(size = 10, face = "plain", hjust = 0.02, margin = margin(b = 0)),
+        plot.margin = margin(2, 2, 2, 2),
+        axis.title.y = element_text(size = 8, margin = margin(r = 0)),
+        axis.title.x = element_text(size = 8, margin = margin(t = -2)),
+        axis.text = element_text(size = 6)
+        )
+
+p3 <- CC_patterns$projection %>%
+  mutate(condition = paste(age, genotype)) %>%
+  ggplot(., aes(Pattern_42, color = condition, lty = condition)) + 
+  stat_ecdf(geom = "step") +
+  ggtitle("Pattern 42") +
+  scale_y_continuous("Cumulative Density", expand = c(0, 0), breaks = c(0, 0.5, 1), labels = c("0", "0.5", "1")) +
+  scale_x_continuous("Pattern Weight", expand = c(0, 0), breaks = c(0, 0.5, 1), labels = c("0", "0.5", "1"), limits = c(0, 1.001)) +
+  scale_color_manual("Age, Genotype", values = c("E12.5 het" = "#E41A1C", "E12.5 hom" = "#377EB8", "E14.5 het" = "#E41A1C", "E14.5 hom" = "#377EB8")) +
+  scale_linetype_manual("Age, Genotype", values = c("E12.5 het" = "solid", "E12.5 hom" = "solid", "E14.5 het" = "dotted", "E14.5 hom" = "dotted")) +
+  theme(aspect.ratio = 1, 
+        legend.position = c(0.55, 0.25), 
+        legend.text = element_text(size = 8),
+        legend.title = element_text(size = 10),
+        plot.title = element_text(size = 10, face = "plain", hjust = 0.02, margin = margin(b = 0)),
+        plot.margin = margin(2, 2, 2, 2),
+        axis.title.y = element_text(size = 8, margin = margin(r = 0)),
+        axis.title.x = element_text(size = 8, margin = margin(t = -2)),
+        axis.text = element_text(size = 6)
+        )
+
+pdf("CC_pattern_ecdf.pdf", width = 8, height = 3, useDingbats = F)
+grid.arrange(p1, p2, p3, nrow = 1)
+dev.off()
+
+
+a <- CC_patterns$projection[CC_patterns$projection$age == "E12.5" & CC_patterns$projection$genotype == "het", paste0("Pattern_", 40:42)]
+b <- CC_patterns$projection[CC_patterns$projection$age == "E12.5" & CC_patterns$projection$genotype == "hom", paste0("Pattern_", 40:42)]
+c <- CC_patterns$projection[CC_patterns$projection$age == "E14.5" & CC_patterns$projection$genotype == "het", paste0("Pattern_", 40:42)]
+d <- CC_patterns$projection[CC_patterns$projection$age == "E14.5" & CC_patterns$projection$genotype == "hom", paste0("Pattern_", 40:42)]
+
+# ** p < 0.05/6
+# *** p < 0.01/6
+ks.test(a$Pattern_40, b$Pattern_40) # p = 0.1931
+ks.test(a$Pattern_40, c$Pattern_40) # p < 2.2e-16 **
+ks.test(a$Pattern_40, d$Pattern_40) # p < 2.2e-16 **
+ks.test(b$Pattern_40, c$Pattern_40) # p < 2.2e-16 **
+ks.test(b$Pattern_40, d$Pattern_40) # p = 3.331e-16 **
+ks.test(c$Pattern_40, d$Pattern_40) # p = 1.609e-5 **
+
+ks.test(a$Pattern_41, b$Pattern_41) # p = 0.02552 
+ks.test(a$Pattern_41, c$Pattern_41) # p < 2.2e-16 **
+ks.test(a$Pattern_41, d$Pattern_41) # p < 2.2e-16 **
+ks.test(b$Pattern_41, c$Pattern_41) # p < 2.2e-16 **
+ks.test(b$Pattern_41, d$Pattern_41) # p = 6.395e-14 **
+ks.test(c$Pattern_41, d$Pattern_41) # p = 3.279e-5 **
+
+ks.test(a$Pattern_42, b$Pattern_42) # p = 0.3977
+ks.test(a$Pattern_42, c$Pattern_42) # p < 2.308e-9 **
+ks.test(a$Pattern_42, d$Pattern_42) # p < 2.976e-9 **
+ks.test(b$Pattern_42, c$Pattern_42) # p < 1.591e-11 **
+ks.test(b$Pattern_42, d$Pattern_42) # p = 3.234e-10 **
+ks.test(c$Pattern_42, d$Pattern_42) # p = 0.003222 *
+
+melted_CC_patterns %>%
+  mutate(condition = paste(age, genotype)) %>%
+  ggplot(., aes(weight, color = condition, lty = condition)) + 
+  stat_ecdf(geom = "step") +
+  facet_wrap(~pattern, ncol = 1, labeller = labeller(pattern = phase)) +
+  labs(x = "Pattern Weight", y = "Cumulative Density") +
+  scale_y_continuous(expand = c(0, 0), breaks = c(0, 0.5, 1), labels = c("0", "0.5", "1")) +
+  scale_x_continuous(expand = c(0, 0), breaks = c(0, 0.5, 1), labels = c("0", "0.5", "1"), limits = c(0, 1.001)) +
+  scale_color_manual("Age, Genotype", values = c("E12.5 het" = "#E41A1C", "E12.5 hom" = "#377EB8", "E14.5 het" = "#E41A1C", "E14.5 hom" = "#377EB8")) +
+  scale_linetype_manual("Age, Genotype", values = c("E12.5 het" = "solid", "E12.5 hom" = "solid", "E14.5 het" = "dotted", "E14.5 hom" = "dotted")) +
+  theme(aspect.ratio = 1, 
+        legend.position = "none", 
+        strip.background = element_blank(),
+        strip.text = element_text(margin = margin(b = 5)),
+        plot.title = element_blank(),
+        plot.margin = margin(0, 2, 0, 0),
+        axis.title = element_text(size = 8),
+        axis.title.y = element_text(margin = margin(r = 0)),
+        axis.title.x = element_text(margin = margin(t = -2)),
+        axis.text = element_text(size = 6)) +
+  coord_flip()
+
+normalized_projections <- apply(projection70$projection, 1,
+                                function(x){
+                                    x=x-min(x)
+                                    x=x/max(x)
+                                })
+
+pdf("ecdf_all_patterns_facet_cluster.pdf", useDingbats = F)
+merge(pData(dat.filtered)[,c("age", "genotype", "cluster")], normalized_projections, by = 0) %>%
+  melt(., id.vars = c("Row.names", "age", "genotype", "cluster")) %>%
+  mutate(condition = paste(age, genotype)) %>%
+  ggplot(., aes(value, color = condition, lty = condition)) + 
+  stat_ecdf(geom = "step") +
+  facet_wrap(~cluster) +
+  ggtitle("Cumulative density of normalized projection weight by cluster") +
+  labs(x = "Pattern Weight", y = "Cumulative Density") +
+  scale_y_continuous(expand = c(0, 0), breaks = c(0, 0.5, 1), labels = c("0", "0.5", "1")) +
+  scale_x_continuous(expand = c(0, 0), breaks = c(0, 0.5, 1), labels = c("0", "0.5", "1"), limits = c(0, 1.001)) +
+  scale_color_manual("Age, Genotype", values = c("E12.5 het" = "#E41A1C", "E12.5 hom" = "#377EB8", "E14.5 het" = "#E41A1C", "E14.5 hom" = "#377EB8")) +
+  scale_linetype_manual("Age, Genotype", values = c("E12.5 het" = "solid", "E12.5 hom" = "solid", "E14.5 het" = "dotted", "E14.5 hom" = "dotted")) +
+  theme(aspect.ratio = 1, 
+        strip.background = element_blank(),
+        legend.position = c(0.75, 0.15), 
+        plot.margin = margin(0, 2, 0, 0),
+        axis.title = element_text(size = 8),
+        axis.title.y = element_text(margin = margin(r = 0)),
+        axis.title.x = element_text(margin = margin(t = -2)),
+        axis.text = element_text(size = 6))
   
-p2 <- tmp %>%
-  mutate(group=paste(age, genotype)) %>%
-  ggplot(.) +
-  geom_density(aes(x = S, color = group)) +
-  facet_wrap(~CellType, scales = "free_y") +
-  scale_color_manual(values = cbPalette[1:4]) +
-  theme(legend.position = "none") +
-  ggtitle("S")
+dev.off()
+
+pdf("ecdf_all_patterns.pdf", useDingbats = F, height = 4, width = 4)
+merge(pData(dat.filtered)[,c("age", "genotype")], normalized_projections, by = 0) %>%
+  melt(., id.vars = c("Row.names", "age", "genotype")) %>%
+  mutate(condition = paste(age, genotype)) %>%
+  ggplot(., aes(value, color = condition, lty = condition)) + 
+  stat_ecdf(geom = "step") +
+  ggtitle("Cumulative density of all normalized projection weights") +
+  labs(x = "Pattern Weight", y = "Cumulative Density") +
+  scale_y_continuous(expand = c(0, 0), breaks = c(0, 0.5, 1), labels = c("0", "0.5", "1")) +
+  scale_x_continuous(expand = c(0, 0), breaks = c(0, 0.5, 1), labels = c("0", "0.5", "1"), limits = c(0, 1.001)) +
+  scale_color_manual("Age, Genotype", values = c("E12.5 het" = "#E41A1C", "E12.5 hom" = "#377EB8", "E14.5 het" = "#E41A1C", "E14.5 hom" = "#377EB8")) +
+  scale_linetype_manual("Age, Genotype", values = c("E12.5 het" = "solid", "E12.5 hom" = "solid", "E14.5 het" = "dotted", "E14.5 hom" = "dotted")) +
+  theme(aspect.ratio = 1, 
+        legend.position = c(0.7, 0.2),
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 8),
+        plot.title = element_text(size = 10),
+        plot.margin = margin(0, 2, 0, 0),
+        axis.title = element_text(size = 8),
+        axis.title.y = element_text(margin = margin(r = 0)),
+        axis.title.x = element_text(margin = margin(t = -2)),
+        axis.text = element_text(size = 6))
+  
+dev.off()
 
 
-p3 <- tmp %>%
-  mutate(group=paste(age, genotype)) %>%
-  ggplot(.) +
-  geom_density(aes(x = G2M, color = group)) +
-  facet_wrap(~CellType, scales = "free_y") +
-  scale_color_manual(values = cbPalette[1:4]) +
-  theme(legend.position = c(0.8, 0.2)) +
-  ggtitle("G2/M")
+pattern_GO_genes <- read.csv("../Linnarsson_enteric_data/ClusterProfiler_genes.csv")
+pattern_GO_genes <- pattern_GO_genes[,paste0("pattern_", 40:42)]
 
-grid.arrange(p1, p2, p3, ncol = 3)
+pattern_GO_genes <- apply(pattern_GO_genes, 2, function(x){
+  str_split(x, pattern = "/")
+})
 
-p1 <- ggplot(tmp) +
-    geom_density(aes(x = G1, color = genotype)) +
-    facet_wrap(~CellType+age, scales = "free_y") +
-    scale_color_brewer(palette = "Set1") +
-    theme(legend.position = "none") +
-    ggtitle("G1")
+pattern_GO_genes <- lapply(pattern_GO_genes, unlist)
 
-p2 <- ggplot(tmp) +
-    geom_density(aes(x = S, color = genotype)) +
-    facet_wrap(~CellType, scales = "free_y") +
-    scale_color_brewer(palette = "Set1") +
-    theme(legend.position = "none") +
-    ggtitle("S")
+pattern_GO_genes <- lapply(pattern_GO_genes, unique)
 
-p3 <- ggplot(tmp) +
-    geom_density(aes(x = G2M, color = genotype)) +
-    facet_wrap(~CellType, scales = "free_y") +
-    scale_color_brewer(palette = "Set1") +
-    theme(legend.position = c(0.8, 0.2)) +
-    ggtitle("G2/M")
+unlist(pattern_GO_genes)
 
-grid.arrange(p1, p2, p3, ncol =3)
+#tmp <- t(scale(t(exprs(dat.filtered[lookupGeneId(dat.filtered, unlist(pattern_GO_genes)),])), scale = T, center = T))
+#heatmap_data <- log10(tmp - min(tmp) + 1)
+
+heatmap_data <- exprs(dat.filtered[lookupGeneId(dat.filtered, unlist(pattern_GO_genes)),])
+
+#heatmap_data <- apply(heatmap_data, 1,
+#                      function(x){
+#                        x = x/mean(x)
+#                        x = log10(x - min(x) + 1)
+#                      })
+
+heatmap_data <- t(heatmap_data)
+
+rownames(heatmap_data) <- lookupGeneName(dat.filtered, rownames(heatmap_data))
+
+heatmap_data <- heatmap_data[order.dendrogram(as.dendrogram(hclust(dist(heatmap_data)))),order.dendrogram(as.dendrogram(hclust(dist(t(heatmap_data)))))]
+
+#myLower <- 0
+myUpper <- 2
+
+#heatmap_data[heatmap_data < myLower] <- myLower
+heatmap_data[heatmap_data > myUpper] <- myUpper
+
+heatmap_annotation <- pData(dat.filtered)[, c("CellType", "genotype", "age")]
+
+heatmap_colors <- list(
+  "Cell Type" =  c("Acetylcholinergic Neuron" = "#E41A1C", 
+                   "Neuron" = "#377EB8",
+                   "Noradrenergic Neuron" = "#4DAF4A", 
+                   "Progenitor/Glia" = "#984EA3",
+                   "Transition Cell" = "#FF7F00"),
+  "Genotype" = c("het" = "black", "hom" = "gray70"),
+  "Age" = c("E12.5" = "#7FC97F", "E14.5" = "#BEAED4"))
+
+colnames(heatmap_annotation)<-c("Cell Type","Genotype","Age")
+
+#pdf("Heatmap_all_cells_wrt_genotype.pdf",height=25,width=18)
+#png("Heatmap_all_cells_wrt_genotype.png",height=15,width=20, units = "in", res = 400)
+pheatmap(mat = heatmap_data,
+         scale="none",
+         show_rownames = TRUE,
+         show_colnames = FALSE,
+         drop_levels = FALSE,
+         cluster_rows = T,
+         cluster_cols = T,
+         color = inferno(100),
+         #breaks=seq(myLower, myUpper, length = 100),
+         #breaks = seq(0, 2.8, length = 200),
+         annotation_col = heatmap_annotation,
+         annotation_colors = heatmap_colors,
+         annotation_names_col = TRUE,
+         annotation_legend = TRUE,
+         fontsize_row = 5,
+         treeheight_col = 0,
+         treeheight_row = 0,
+         cutree_rows = 3
+         )
+#dev.off()
+
+
+
+```
+
+```{r cyclone_vs_patterns}
+plotUMAP(dat.filtered, color = "CC_phase", size = 0.8) +
+  theme_classic() +
+  theme(aspect.ratio = 1, legend.position = c(0.8, 0.2))
+
+CC_corr <- cor(t(projection70$projection), pData(dat.filtered)[,c("G1", "S", "G2M")])
+CC_corr.pmat <- cor.mtest(merge(t(projection70$projection), pData(dat.filtered)[,c("G1", "S", "G2M")], by = 0)[,-1])
+CC_corr.pmat <- CC_corr.pmat$p
+rownames(CC_corr.pmat) <- c(paste0("pattern_", c(1:70)), "G1", "S", "G2M")
+colnames(CC_corr.pmat) <- rownames(CC_corr.pmat)
+
+CC_corr.pmat <- CC_corr.pmat[1:70, 71:73]
+
+apply(CC_corr, 2, which.max)
+apply(CC_corr, 2, function(x){x[which.max(x)]})
+
+apply(CC_corr, 2, which.min)
+apply(CC_corr, 2, function(x){x[which.min(x)]})
 ```
 
 ```{r Louvain_clustering}
@@ -111,7 +938,8 @@ NetworkToolbox::louvain()
 ```{r velocyto}
 ldat <- read.loom.matrices("../Velocyto/merged.loom")
 
-hist(log10(rowSums(ldat$spliced)+1),col='wheat',xlab='log10[ number of reads + 1]',main='number of reads per gene')
+p <- hist(log10(apply(ldat$spliced, 1, sum) + 1), col='wheat',xlab='log10[ number of reads + 1]',main='number of reads per gene')
+p
 
 ldat <- lapply(ldat,function(x) { # remove :SAMPLE_NAME.bam
   colnames(x) <-  gsub(":.*$", "", colnames(x))
@@ -124,38 +952,24 @@ ldat <- lapply(ldat, function(x) { # filter to only expressed genes, instead of 
 
 cell.colors <- ifelse(pData(dat.filtered)$genotype == "het", "#E41A1C", "#377EB8")
 
-cell.colors <- rep(NA, 1003)
+cell.colors <- sapply(pData(dat.filtered)$batch, function(x){
+  if(x == "HD01"){
+  "#E41A1C"
+}else if(x == "HD02"){
+  "#377EB8"
+}else if(x == "HD03_pool_1"){
+  "#4DAF4A"
+}else if(x == "HD03_pool_2"){
+  "#984EA3"
+}else if(x == "HD03_pool_3"){
+  "#FF7F00"
+}else{
+  NA
+}
+})
+
 names(cell.colors) <- pData(dat.filtered)$cell_id
 
-for(i in 1:1003){
-if(pData(dat.filtered)$CellType[i] == "Acetylcholinergic Neuron"){
-  cell.colors[i] <- "#E41A1C"
-}else if(pData(dat.filtered)$CellType[i] == "Neuron"){
-  cell.colors[i] <- "#377EB8"
-}else if(pData(dat.filtered)$CellType[i] == "Noradrenergic Neuron"){
-  cell.colors[i] <- "#4DAF4A"
-}else if(pData(dat.filtered)$CellType[i] == "Progenitor/Glia"){
-  cell.colors[i] <- "#984EA3"
-}else{
-  cell.colors[i] <- "#FF7F00"
-}
-}
-
-for(i in 1:1003){
-if(pData(dat.filtered)$batch[i] == "HD01"){
-  cell.colors[i] <- "#E41A1C"
-}else if(pData(dat.filtered)$batch[i] == "HD02"){
-  cell.colors[i] <- "#377EB8"
-}else if(pData(dat.filtered)$batch[i] == "HD03_pool_1"){
-  cell.colors[i] <- "#4DAF4A"
-}else if(pData(dat.filtered)$batch[i] == "HD03_pool_2"){
-  cell.colors[i] <- "#984EA3"
-}else{
-  cell.colors[i] <- "#FF7F00"
-}
-}
-
-names(cell.colors) <- pData(dat.filtered)$cell_id
 emb <- as.matrix(pData(dat.filtered)[,c("UMAP1", "UMAP2")])
 
 
@@ -164,8 +978,8 @@ nmat <- ldat$unspliced # intronic read (unspliced) expression matrix
 smat <- ldat$spanning # spanning read (intron+exon) expression matrix
 
 fit.quantile <- 0.05
-rvel.qf <- gene.relative.velocity.estimates(emat,nmat,deltaT=1,kCells = 5,fit.quantile = fit.quantile) # perhaps the most robust estimate, that combines cell kNN pooling with the gamma fit based on an extreme quantiles
-pca.velocity.plot(rvel.qf,nPcs=5,plot.cols=2,cell.colors=ac(cell.colors,alpha=0.7),cex=1.2,pcount=0.1,pc.multipliers=c(1,-1,-1,-1,-1)) # visualize the velocities by projecting observed and extrapolated cells onto the first 5 PCs
+rvel.qf <- gene.relative.velocity.estimates(emat, nmat, deltaT = 1, kCells = 5, fit.quantile = fit.quantile) # perhaps the most robust estimate, that combines cell kNN pooling with the gamma fit based on an extreme quantiles
+pca.velocity.plot(rvel.qf, nPcs = 5, plot.cols = 2, cell.colors = ac(cell.colors, alpha = 0.7), cex = 1.2, pcount = 0.1, pc.multipliers = c(1,-1,-1,-1,-1)) # visualize the velocities by projecting observed and extrapolated cells onto the first 5 PCs
 
 
 #gene.relative.velocity.estimates(emat,nmat, kCells = 5,fit.quantile = fit.quantile,old.fit=rvel.qf,show.gene='Chga',cell.emb=emb,cell.colors=cell.colors)
@@ -175,22 +989,147 @@ pca.velocity.plot(rvel,nPcs=5,plot.cols=2,cell.colors=ac(cell.colors,alpha=0.7),
 
 #####
 
-cell.alpha=0.4
+cell.alpha=1
 cell.cex=1
 
-vel <- rvel #spanning reads
+vel <- rvel.qf #knn pooling
 
-show.velocity.on.embedding.cor(as.matrix(emb),vel,n=100,scale='sqrt',cell.colors=ac(cell.colors,alpha=cell.alpha),cex=cell.cex,arrow.scale=30,arrow.lwd=1)
+p <- custom_show.velocity.on.embedding.cor(as.matrix(emb), vel, n = 50, scale = 'sqrt', cell.colors = ac(cell.colors, alpha = cell.alpha), cex = cell.cex, arrow.scale = 20, arrow.lwd = 1, return.details = T)
 
-show.velocity.on.embedding.cor(as.matrix(emb),vel,n=100,scale='sqrt',cell.colors=ac(cell.colors,alpha=cell.alpha),cex=cell.cex,arrow.scale=30,show.grid.flow=TRUE,min.grid.cell.mass=0.5,grid.n=20,arrow.lwd=2)
+show.velocity.on.embedding.cor(as.matrix(emb), vel, n = 50, scale = 'sqrt', cell.colors = ac(cell.colors, alpha = cell.alpha), cex = cell.cex, arrow.scale = 30, show.grid.flow = TRUE, min.grid.cell.mass = 0.5, grid.n = 30, arrow.lwd = 2, cell.border.alpha = 0)
 
-vel <- rvel.qf #Knn pooling
-show.velocity.on.embedding.cor(as.matrix(emb),vel,n=100,scale='sqrt',cell.colors=ac(cell.colors,alpha=cell.alpha),cex=cell.cex,arrow.scale=30,arrow.lwd=1)
+velocities <- merge(p$velocity, pData(dat.filtered)[, c("age", "sex", "genotype", "cluster", "final_celltype", "CC_phase")], by = 0)
 
-show.velocity.on.embedding.cor(as.matrix(emb),vel,n=100,scale='sqrt',cell.colors=ac(cell.colors,alpha=cell.alpha),cex=cell.cex,arrow.scale=30,show.grid.flow=TRUE,min.grid.cell.mass=0.5,grid.n=20,arrow.lwd=2)
+#########################
+# Cluster
+#########################
 
-x <- show.velocity.on.embedding.eu(as.matrix(emb),rvel,n=40,scale='sqrt',cell.colors=ac(cell.colors,alpha=cell.alpha),cex=cell.cex,nPcs=30,sigma=2.5,show.trajectories=TRUE,diffusion.steps=400,n.trajectory.clusters=15,ntop.trajectories=1,embedding.knn=T,control.for.neighborhood.density=TRUE,n.cores=40) 
+cluster_velocities <- as.data.frame(
+  velocities %>%
+  group_by(cluster) %>%
+  summarize(mean_Vx = mean(Vx), mean_Vy = mean(Vy), sd_Vx = sd(Vx), sd_Vy = sd(Vy), se_Vx = sd(Vx)/sqrt(n()), se_Vy = sd(Vy)/sqrt(n()))
+)
+
+ggplot(cluster_velocities) +
+  theme_gray() +
+  geom_hline(yintercept = 0, color = "gray50") +
+  geom_vline(xintercept = 0, color = "gray50") +
+  ggforce::geom_ellipse(aes(x0 = mean_Vx, y0 = mean_Vy, a = se_Vx, b = se_Vy, angle = 0, color = cluster, fill = cluster), alpha = 0.1, lty = "dashed") +
+  geom_segment(aes(x = 0, y = 0, xend = mean_Vx, yend = mean_Vy, color = cluster), lineend = "round", linejoin = "mitre", arrow = arrow(length = unit(0.02, "npc"))) +
+  scale_color_brewer(palette = "Set1", guide = guide_legend(ncol = 2)) +
+  scale_fill_brewer(palette = "Set1", guide = guide_legend(ncol = 2)) +
+  scale_y_continuous(limits = c(-0.03, 0.03), breaks = seq(-0.03, 0.03, 0.01), expand = c(0,0)) +
+  scale_x_continuous(limits = c(-0.09, 0.04), breaks = seq(-0.09, 0.04, 0.01), expand = c(0,0)) +
+  coord_fixed() +
+  labs(x = "Mean Vx", y = "Mean Vy", color = "Cluster", fill = "Cluster", title = "Mean RNA Velocity by Cluster") +
+  theme(legend.position = c(0.1, 0.75), legend.background = element_blank())
+
+#########################
+# Cluster:genotype
+#########################
+
+cluster_genotype_velocities <- as.data.frame(
+  velocities %>%
+  group_by(cluster, genotype) %>%
+  summarize(mean_Vx = mean(Vx), mean_Vy = mean(Vy), sd_Vx = sd(Vx), sd_Vy = sd(Vy), se_Vx = sd(Vx)/sqrt(n()), se_Vy = sd(Vy)/sqrt(n()))
+)
+
+ggplot(cluster_genotype_velocities) +
+  theme_gray() +
+  geom_hline(yintercept = 0, color = "gray50") +
+  geom_vline(xintercept = 0, color = "gray50") +
+  ggforce::geom_ellipse(aes(x0 = mean_Vx, y0 = mean_Vy, a = se_Vx, b = se_Vy, angle = 0, color = cluster, fill = cluster, lty = genotype), alpha = 0.1) +
+  geom_segment(aes(x = 0, y = 0, xend = mean_Vx, yend = mean_Vy, color = cluster, lty = genotype), lineend = "round", linejoin = "mitre", arrow = arrow(length = unit(0.02, "npc"))) +
+  scale_color_brewer(palette = "Set1", guide = guide_legend(ncol = 2)) +
+  scale_fill_brewer(palette = "Set1", guide = guide_legend(ncol = 2)) +
+  scale_x_continuous(limits = c(-0.09, 0.05), breaks = seq(-0.09, 0.05, 0.01), expand = c(0,0)) +
+  scale_y_continuous(limits = c(-0.09, 0.04), breaks = seq(-0.09, 0.04, 0.01), expand = c(0,0)) +
+  coord_fixed() +
+  labs(x = "Mean Vx", y = "Mean Vy", color = "Cluster", fill = "Cluster", title = "Mean RNA Velocity by Cluster:Genotype") +
+  theme(legend.position = c(0.1, 0.25), legend.background = element_blank())
 
 
+ggplot(cluster_genotype_velocities) +
+  theme_gray() +
+  geom_hline(yintercept = 0, color = "gray50") +
+  geom_vline(xintercept = 0, color = "gray50") +
+  ggforce::geom_ellipse(aes(x0 = mean_Vx, y0 = mean_Vy, a = se_Vx, b = se_Vy, angle = 0, color = cluster, fill = cluster, lty = genotype), alpha = 0.1) +
+  geom_segment(aes(x = 0, y = 0, xend = mean_Vx, yend = mean_Vy, color = cluster, lty = genotype), lineend = "round", linejoin = "mitre", arrow = arrow(length = unit(0.02, "npc"))) +
+  facet_wrap(~cluster) +
+  scale_color_brewer("Cluster", palette = "Set1", guide = guide_legend(ncol = 2)) +
+  scale_fill_brewer("Cluster", palette = "Set1", guide = guide_legend(ncol = 2)) +
+  scale_linetype("Genotype") +
+  scale_x_continuous("Mean Vx", limits = c(-0.09, 0.05), breaks = seq(-0.08, 0.04, 0.04), expand = c(0,0)) +
+  scale_y_continuous("Mean Vy", limits = c(-0.09, 0.05), breaks = seq(-0.08, 0.04, 0.04), expand = c(0,0)) +
+  coord_fixed() +
+  ggtitle("Mean RNA Velocity by Cluster:Genotype") +
+  theme(legend.position = c(0.83, 0.15), legend.background = element_blank(), legend.box = "horizontal")
 
+ggplot(cluster_genotype_velocities) +
+  theme_gray() +
+  geom_hline(yintercept = 0, color = "gray50") +
+  geom_vline(xintercept = 0, color = "gray50") +
+  geom_segment(x = 0, y = 0, lineend = "round", linejoin = "mitre", arrow = arrow(length = unit(0.02, "npc")), aes(xend = mean_Vx, yend = mean_Vy, color = cluster, lty = genotype)) +
+  scale_color_brewer(palette = "Set1", guide = guide_legend(ncol = 2)) +
+#  scale_x_continuous(limits = c(-0.09, 0.04), breaks = seq(-0.09, 0.04, 0.01), expand = c(0,0)) +
+    scale_x_continuous(breaks = seq(-0.09, 0.04, 0.01)) +
+#  scale_y_continuous(limits = c(-0.03, 0.03), breaks = seq(-0.03, 0.03, 0.01), expand = c(0,0)) +
+  scale_y_continuous(breaks = seq(-0.09, 0.03, 0.01)) +
+  coord_fixed() +
+  labs(x = "Mean Vx", y = "Mean Vy", color = "Cluster", lty = "Genotype", title = "Mean RNA Velocity by Cluster:Genotype") +
+  theme(axis.line = element_blank(), legend.position = c(0.8, 0.25), legend.background = element_blank())
+
+#########################
+# Cell type:genotype
+#########################
+
+celltype_genotype_velocities <- as.data.frame(
+  velocities %>%
+  group_by(final_celltype, genotype) %>%
+  summarize(mean_Vx = mean(Vx), mean_Vy = mean(Vy), sd_Vx = sd(Vx), sd_Vy = sd(Vy), se_Vx = sd(Vx)/sqrt(n()), se_Vy = sd(Vy)/sqrt(n()))
+)
+
+ggplot(celltype_genotype_velocities) +
+  theme_gray() +
+  geom_hline(yintercept = 0, color = "gray50") +
+  geom_vline(xintercept = 0, color = "gray50") +
+  geom_segment(x = 0, y = 0, lineend = "round", linejoin = "mitre", arrow = arrow(length = unit(0.02, "npc")), aes(xend = mean_Vx, yend = mean_Vy, color = final_celltype, lty = genotype)) +
+  scale_color_brewer(palette = "Set1", guide = guide_legend(ncol = 2)) +
+#  scale_x_continuous(limits = c(-0.09, 0.04), breaks = seq(-0.09, 0.04, 0.01), expand = c(0,0)) +
+    scale_x_continuous(breaks = seq(-0.08, 0.02, 0.01)) +
+#  scale_y_continuous(limits = c(-0.03, 0.03), breaks = seq(-0.03, 0.03, 0.01), expand = c(0,0)) +
+#  scale_y_continuous(breaks = seq(-0.09, 0.03, 0.01)) +
+  coord_fixed() +
+  labs(x = "Mean Vx", y = "Mean Vy", color = "Cell Type", lty = "Genotype", title = "Mean RNA Velocity by Cell Type:Genotype") +
+  theme(axis.line = element_blank(), 
+        legend.position = "bottom",
+        #legend.position = c(0.8, 0.25), 
+        legend.background = element_blank())
+
+#########################
+# Genotype
+#########################
+
+genotype_velocities <- as.data.frame(
+  velocities %>%
+  group_by(genotype) %>%
+  summarize(mean_Vx = mean(Vx), mean_Vy = mean(Vy), sd_Vx = sd(Vx), sd_Vy = sd(Vy), se_Vx = sd(Vx)/sqrt(n()), se_Vy = sd(Vy)/sqrt(n()))
+)
+
+ggplot(genotype_velocities) +
+  theme_gray() +
+  geom_hline(yintercept = 0, color = "gray50") +
+  geom_vline(xintercept = 0, color = "gray50") +
+  geom_segment(x = 0, y = 0, lineend = "round", linejoin = "mitre", arrow = arrow(length = unit(0.02, "npc")), aes(xend = mean_Vx, yend = mean_Vy, color = genotype)) +
+  scale_color_brewer(palette = "Set1", guide = guide_legend(ncol = 2)) +
+#  scale_x_continuous(limits = c(-0.09, 0.04), breaks = seq(-0.09, 0.04, 0.01), expand = c(0,0)) +
+    scale_x_continuous(breaks = seq(-0.02, 0, 0.01)) +
+#  scale_y_continuous(limits = c(-0.03, 0.03), breaks = seq(-0.03, 0.03, 0.01), expand = c(0,0)) +
+  scale_y_continuous(breaks = seq(-0.01, 0, 0.01)) +
+  coord_fixed() +
+  labs(x = "Mean Vx", y = "Mean Vy", color = "Genotype", title = "Mean RNA Velocity by Genotype") +
+  theme(axis.line = element_blank(), 
+        #legend.position = "bottom",
+        legend.position = c(0.8, 0.25), 
+        legend.background = element_blank())
 ```

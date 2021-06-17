@@ -1,15 +1,16 @@
 plotUMAP(dat.filtered, color = "CellType") +
   scale_color_manual("Cell Type", values = c(cbPalette[c(1:3, 6)], "#999999")) +
   theme(aspect.ratio = 1, legend.position = c(0.8, 0.2))
+
 plotUMAP(tmp, color = "subset_pred_description") + 
   scale_color_manual("Cell Type", values = cbPalette[c(1, 5, 6, 7)]) +
   theme(aspect.ratio = 1, , legend.position = c(0.7, 0.2))
 
-plotUMAP(dat.filtered, color = "cluster") +
-#  scale_color_manual("Cluster", values = colorRampPalette(brewer.pal(9, "Set1"))(10), guide = guide_legend(ncol = 2)) +
-  scale_color_brewer("Cluster", palette = "Set1", guide = guide_legend(ncol = 2)) +
+plotUMAP(dat.filtered, color = "final_celltype", size = 1) +
+  scale_color_manual(values = cbPalette[c(6, 1, 4, 3, 2, 5)]) +
   theme_classic() +
   theme(aspect.ratio = 1, legend.position = c(0.8, 0.2))
+
 
 tmp <- cluster_specificity[cluster_specificity$cluster == 4, ]
 ggplot(tmp, aes(x = log10(mean_expr + 1), y = specificity, label = ifelse(tmp$gene_short_name %in% c("Tac1", "Ecel1", "Scng", "Th", "Chgb", "Mapt", "Prph", "Stmn3", "Sncg", "Snap25", "Meg3", "Stmn2", "Rtn1"), tmp$gene_short_name, ""))) +
@@ -44,10 +45,6 @@ ggplot(pData(dat.filtered)[pData(dat.filtered)$cluster %in% c(4, 9),]) +
   geom_bar(aes(x = cluster, fill = genotype), position = "dodge") +
   scale_fill_brewer("Genotype", palette = "Set1") +
   labs(x = "Cluster", y = "Count")
-
-plotUMAP(dat.filtered, color = "genotype") +
-  theme(aspect.ratio = 1, legend.position = c(0.8, 0.2))
-
 
 
 tmp <- t(scale(t(exprs(dat.filtered[genotypeCellType_diff_test_sorted_sig_genes,])),scale = T,center = T))
@@ -226,3 +223,72 @@ plotUMAP(dat.filtered, markers = "Slc27a4", size = 1) +
   scale_color_gradient(low = "gray", high = "darkorange1") + 
   theme_classic() + 
   theme(legend.position = "none", axis.line = element_blank(), axis.text = element_blank(), axis.title = element_blank(), axis.ticks = element_blank())
+
+
+tmp <- pData(dat.filtered) %>%
+  mutate(condition = paste(age, sex, genotype, sep = '\n'))
+
+tmp <- as.data.frame(apply(table(tmp[,c("condition", "final_celltype")]), 1, function(x){ x/sum(x) }))
+tmp$celltype <- rownames(tmp)
+tmp <- melt(tmp, id.vars = "celltype")
+
+ggplot(tmp) +
+  geom_col(aes(x = variable, y = value, fill = celltype)) +
+  scale_y_continuous(expand = c(0,0)) +
+  scale_fill_manual(values = cbPalette[c(6, 1, 4, 3, 2, 5)]) +
+  labs(x = "", y = "Proportion", fill = "Cell Type") +
+  theme_classic()
+
+ggplot(tmp) +
+  geom_col(aes(x = variable, y = value, fill = celltype), position = "dodge") +
+  scale_y_continuous(expand = c(0,0)) +
+  scale_fill_manual(values = cbPalette[c(6, 1, 4, 3, 2, 5)]) +
+  labs(x = "", y = "Proportion", fill = "Cell Type") +
+  theme_classic()
+
+ggplot(tmp) +
+  geom_col(aes(x = celltype, y = value, fill = variable), position = "dodge") +
+  scale_y_continuous(expand = c(0,0)) +
+  labs(x = "", y = "Proportion", fill = "condition") +
+  theme_classic()
+
+tmp <- pData(dat.filtered) %>%
+  mutate(condition = paste(age, genotype, sep = '\n'))
+
+tmp <- as.data.frame(apply(table(tmp[,c("condition", "final_celltype")]), 1, function(x){ x/sum(x) }))
+tmp$celltype <- rownames(tmp)
+tmp <- melt(tmp, id.vars = "celltype")
+
+
+
+venn.diagram(list(Neurons = neuron_genotype_diff_test_sigGenes, Glia = glia_genotype_diff_test_sigGenes),
+             fill = c("#56B4E9", "#D55E00"), alpha = c(0.5, 0.5), lty =1, filename = "test", height = 4000, width = 4000, filetype = "svg")
+
+
+naiveProportion.ex <- (table(pData(dat.filtered)$genotype)/sum(table(pData(dat.filtered)$genotype)))[2]
+clusterByGenotype.ex <- table(pData(dat.filtered)$cluster, pData(dat.filtered)$genotype)
+
+clusterByGenotype.chisq.test.ex <- apply(clusterByGenotype.ex, MARGIN = 1, function(x){
+  prop.test(x[2], sum(x), alternative = "two.sided", correct = TRUE, p = naiveProportion.ex)$p.value
+})
+
+clusterByGenotype.df.ex <- data.frame(index = c(1:length(unique(pData(dat.filtered)$cluster))), pval = clusterByGenotype.chisq.test.ex, sig = " ")
+clusterByGenotype.df.ex$sig <- as.character(clusterByGenotype.df.ex$sig)
+clusterByGenotype.df.ex$sig[clusterByGenotype.df.ex$pval <= 0.0001] <- "*"
+
+pdf("figures/Cluster_proportions.pdf", height = 2.5, width = 2.5)
+ggplot(pData(dat.filtered)) + 
+  geom_bar(aes(x = cluster, fill = genotype), position = "fill") + 
+#  scale_fill_brewer("Genotype", palette = "Set1", labels = c("RetCFP/+", "RetCFP/CFP")) + 
+  scale_fill_brewer(palette = "Set1") + 
+  geom_hline(aes(yintercept = naiveProportion.ex), linetype = "dashed", col = "grey20") +
+  #  ggtitle("Proportion of excitatory neurons in cluster by genotype") +
+  annotate(geom = "text", x = 1, y = naiveProportion.ex, label = "Naive Proportion", vjust = -1, size = 2, hjust = .15) +
+  geom_text(aes(x = index, y = 0, hjust = -0.1, label = paste0("p = ", format(pval, scientific = TRUE, digits = 3), " ", sig)), data = clusterByGenotype.df.ex, angle = 90, size = 2) + 
+  #scale_color_manual(values = c("grey70", "black")) + 
+  scale_y_continuous(expand = c(0,0)) +
+  guides(color = FALSE, fill = FALSE) + 
+  labs(y = "Proportion", x = "Cluster") +
+  theme(axis.ticks.x = element_blank(), axis.text = element_text(size = 6), axis.title = element_text(size = 8)) +
+  monocle:::monocle_theme_opts()
+dev.off()

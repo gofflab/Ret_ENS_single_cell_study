@@ -106,7 +106,6 @@ ggbiplot(dat.filtered.pca,var.axes=F,groups=pData(dat.filtered)$batch,ellipse=T)
 
 # Umap
 ```{r Umap}
-#Try umap on pattern weights
 embedding <- umap(t(log10(exprs(dat.filtered[expressed_genes,]) + 1)),n_neighbors = 15L)
 
 pData(dat.filtered)$UMAP1 <- embedding$UMAP1
@@ -249,7 +248,7 @@ pData(dat.filtered) %>%
 ```
 
 ```{r clustering}
-m <- Mclust(data = pData(dat.filtered.expressed.normalized)[c("UMAP1", "UMAP2")], G = 11)
+m <- Mclust(data = pData(dat.filtered.expressed.normalized)[c("UMAP1", "UMAP2")]) # returns 9 clusters
 plot(m)
 pData(dat.filtered.expressed.normalized)$cluster <- as.factor(m$classification)
 
@@ -262,18 +261,55 @@ pData(dat.filtered)$cluster <- as.factor(m$classification)
 
 plotUMAP(dat.filtered, color = "cluster")
 
-levels(pData(dat.filtered)$cluster)[levels(pData(dat.filtered)$cluster)==9] <- 7
-levels(pData(dat.filtered)$cluster)[levels(pData(dat.filtered)$cluster)==5] <- 3
-levels(pData(dat.filtered)$cluster)[levels(pData(dat.filtered)$cluster)==6] <- 1
+original_cluster <- 1:9
+new_cluster <- c(3, 5, 4, 8, 2, 6, 7, 1, 9)
+x <- data.frame(original = original_cluster, new = new_cluster)
+dat.filtered$cluster <- x[as.numeric(pData(dat.filtered)$cluster), "new"] #reorder clusters to be sequential on UMAP
 
-levels(pData(dat.filtered)$cluster)[levels(pData(dat.filtered)$cluster)==7] <- 5
-levels(pData(dat.filtered)$cluster)[levels(pData(dat.filtered)$cluster)==8] <- 6
-levels(pData(dat.filtered)$cluster)[levels(pData(dat.filtered)$cluster)==10] <- 7
-levels(pData(dat.filtered)$cluster)[levels(pData(dat.filtered)$cluster)==11] <- 8
-
+pData(dat.filtered)$cluster <- as.factor(dat.filtered$cluster)
 plotUMAP(dat.filtered, color = "cluster")
 
 pData(dat.filtered.expressed.normalized)$cluster <- pData(dat.filtered)$cluster
+
+naiveProportion.ex <- (table(pData(dat.filtered)$genotype)/sum(table(pData(dat.filtered)$genotype)))[2]
+clusterByGenotype.ex <- table(pData(dat.filtered)$cluster, pData(dat.filtered)$genotype)
+
+clusterByGenotype.chisq.test.ex <- apply(clusterByGenotype.ex, MARGIN = 1, function(x){
+  prop.test(x[2], sum(x), alternative = "two.sided", correct = TRUE, p = naiveProportion.ex)$p.value
+})
+
+clusterByGenotype.df.ex <- 
+  data.frame(index = c(1:length(unique(pData(dat.filtered)$cluster))), 
+             pval = clusterByGenotype.chisq.test.ex, sig = " ")
+clusterByGenotype.df.ex$sig <- as.character(clusterByGenotype.df.ex$sig)
+clusterByGenotype.df.ex$sig[clusterByGenotype.df.ex$pval <= 0.01/9] <- "*"
+
+pdf("Cluster_proportion.pdf", height = 2, width = 2)
+ggplot(pData(dat.filtered)) + 
+  geom_bar(aes(x = cluster, fill = genotype), position = "fill") + 
+  #scale_fill_brewer("Genotype", palette = "Set1", labels = c("RetCFP/+", "RetCFP/CFP")) + 
+  scale_fill_brewer(palette = "Set1", guide = F) + 
+  geom_hline(aes(yintercept = naiveProportion.ex), linetype = "dashed", col = "grey20") +
+  geom_text(aes(x = index, 
+                y = 1, 
+                hjust = -1,
+                vjust = 1,
+                label = sig), 
+            data = clusterByGenotype.df.ex, 
+            angle = 90, 
+            size = 2) + 
+  coord_cartesian(clip = "off") +
+  scale_y_continuous("Proportion", expand = c(0,0), breaks = c(0, 0.25, naiveProportion.ex, 0.5, 0.75, 1), labels = c(0, 0.25, "naive\nproportion", 0.5, 0.75, 1)) +
+  scale_x_discrete("Cluster") +
+  theme(plot.margin = margin(6, 0, -10, -12),
+        axis.ticks.x = element_blank(), 
+        axis.text = element_text(size = 6),
+        axis.text.x = element_text(vjust = 2),
+        axis.title = element_text(size = 8),
+        axis.title.x = element_text(vjust = 4),
+        axis.title.y = element_text(vjust = -7)) +
+  monocle:::monocle_theme_opts()
+dev.off()
 ```
 
 ## Build the Cell Type Hierarchy

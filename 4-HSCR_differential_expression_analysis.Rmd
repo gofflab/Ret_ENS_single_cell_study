@@ -480,23 +480,22 @@ pheatmap(mat = heatmap_data,
          )
 ```
 
-```{r}
-neuron_bifuracation_difftest <- differentialGeneTest(dat.filtered[expressed_genes,pData(dat.filtered)$cluster %in% c(4, 9)], fullModelFormulaStr = "~batch + sex + genotype + CellType + cluster", reducedModelFormulaStr = "~batch + sex + genotype + CellType", cores = detectCores()-1)
+```{r neuron_bifurcation_diff_test}
+neuron_bifuracation_difftest <- differentialGeneTest(dat.filtered[expressed_genes,pData(dat.filtered)$cluster %in% c(4, 5)], fullModelFormulaStr = "~batch + cluster", reducedModelFormulaStr = "~batch", cores = detectCores()-1)
 
-neuron_bifuracation_difftest_sorted <- neuron_bifuracation_difftest[order(neuron_bifuracation_difftest$qval),]
+neuron_bifuracation_difftest_sorted <- neuron_bifuracation_difftest[order(neuron_bifuracation_difftest$pval),]
 
-neuron_bifuracation_difftest_sorted_sig_genes <- rownames(neuron_bifuracation_difftest_sorted[neuron_bifuracation_difftest_sorted$qval < 0.01,])
+neuron_bifuracation_difftest_sorted_sig_genes <- rownames(neuron_bifuracation_difftest_sorted[neuron_bifuracation_difftest_sorted$qval < 0.05/length(expressed_genes),])
 
 bifurcation_gene_names <- lookupGeneName(dat.filtered, neuron_bifuracation_difftest_sorted_sig_genes)
 
-# het-only = 9, mixed pop = 4
+# het-only = 5, mixed pop = 4
 
 pop4_means <- apply(exprs(dat.filtered)[neuron_bifuracation_difftest_sorted_sig_genes, pData(dat.filtered)$cluster == 4], 1,mean)
-pop9_means <- apply(exprs(dat.filtered)[neuron_bifuracation_difftest_sorted_sig_genes, pData(dat.filtered)$cluster == 9], 1,mean)
+pop5_means <- apply(exprs(dat.filtered)[neuron_bifuracation_difftest_sorted_sig_genes, pData(dat.filtered)$cluster == 5], 1,mean)
 
-relative_exprs <- pop9_means/pop4_means
-# 9 = het 
-#relative_exprs <- apply(exprs(tmp)[neuron_bifuracation_difftest_sorted_sig_genes,pData(tmp)$Cluster == 10], 1,mean)/apply(exprs(tmp)[neuron_bifuracation_difftest_sorted_sig_genes,pData(tmp)$Cluster == 9], 1,mean)
+relative_exprs <- pop5_means/pop4_means
+# 5 = het 
 
 upregulated_in_het <- names(relative_exprs[relative_exprs > 1 | relative_exprs == "Inf"])
 
@@ -525,7 +524,118 @@ ego_downregulated <- enrichGO(gene = downregulated_in_het_entrez,
                 pvalueCutoff  = 0.05,
                 qvalueCutoff  = 1, 
                 readable      = TRUE)
+
+
+tmp <- t(scale(t(exprs(dat.filtered[neuron_bifuracation_difftest_sorted_sig_genes, pData(dat.filtered)$cluster %in% c(4, 5)])), scale = T, center = T))
+heatmap_data <- log10(tmp - min(tmp) + 1)
+
+rownames(heatmap_data) <- lookupGeneName(dat.filtered, rownames(heatmap_data))
+
+heatmap_data <- heatmap_data[order.dendrogram(as.dendrogram(hclust(dist(heatmap_data)))),order.dendrogram(as.dendrogram(hclust(dist(t(heatmap_data)))))]
+
+#myLower <- 0.1
+#myUpper <- 0.9
+
+#heatmap_data[heatmap_data < myLower] <- myLower
+#heatmap_data[heatmap_data > myUpper] <- myUpper
+
+heatmap_annotation <- pData(dat.filtered)[, c("cluster", "genotype", "age")]
+
+heatmap_colors <- list(
+  "Cluster" = c("4" = "#984EA3",
+                "5" = "#FF7F00"),
+  "Genotype" = c("het" = "#E41A1C", "hom" = "#377EB8"),
+  "Age" = c("E12.5" = "black", "E14.5" = "gray"))
+
+colnames(heatmap_annotation)<-c("Cluster","Genotype","Age")
+
+#pdf("Heatmap_all_cells_wrt_genotype.pdf",height=25,width=18)
+#png("Heatmap_all_cells_wrt_genotype.png",height=15,width=20, units = "in", res = 400)
+pheatmap(mat = heatmap_data,
+         scale="none",
+         show_rownames = TRUE,
+         show_colnames = FALSE,
+         drop_levels = FALSE,
+         cluster_rows = F,
+         cluster_cols = F,
+         color = colorRampPalette(colors = c("#377EB8", "white", "#E41A1C"))(100),
+         #breaks=seq(myLower, myUpper, length = 100),
+         #breaks = seq(0, 2.8, length = 200),
+         annotation_col = heatmap_annotation,
+         annotation_colors = heatmap_colors,
+         annotation_names_col = TRUE,
+         annotation_legend = TRUE,
+         fontsize_row = 5#,
+         #treeheight_col = 0,
+         #treeheight_row = 0,
+         #main = "All Cells\n254 Genes, 1% FDR\nFull model: ~ genotype + batch  + sex + cell type\nReduced model: ~ batch + sex + cell type"
+         )
+#dev.off()
+
 ```
+
+```{r Ret_independent_genotype_diff}
+Ret_independent_difftest <- differentialGeneTest(dat.filtered[expressed_genes,pData(dat.filtered)$cluster %in% c(4, 6)], fullModelFormulaStr = "~batch + genotype", reducedModelFormulaStr = "~batch", cores = detectCores()-1)
+
+Ret_independent_difftest_sorted <- Ret_independent_difftest[order(Ret_independent_difftest$pval),]
+
+Ret_independent_difftest_sorted_sig_genes <- rownames(Ret_independent_difftest_sorted[Ret_independent_difftest_sorted$qval < 0.05/length(expressed_genes),])
+
+Ret_independent_gene_names <- lookupGeneName(dat.filtered, Ret_independent_difftest_sorted_sig_genes)
+
+
+
+tmp <- t(scale(t(exprs(dat.filtered[Ret_independent_difftest_sorted_sig_genes, pData(dat.filtered)$cluster %in% c(4, 6)])), scale = T, center = T))
+heatmap_data <- log10(tmp - min(tmp) + 1)
+
+rownames(heatmap_data) <- lookupGeneName(dat.filtered, rownames(heatmap_data))
+
+heatmap_data <- heatmap_data[order.dendrogram(as.dendrogram(hclust(dist(heatmap_data)))),order.dendrogram(as.dendrogram(hclust(dist(t(heatmap_data)))))]
+
+#myLower <- 0.1
+#myUpper <- 0.9
+
+#heatmap_data[heatmap_data < myLower] <- myLower
+#heatmap_data[heatmap_data > myUpper] <- myUpper
+
+heatmap_annotation <- pData(dat.filtered)[, c("cluster", "genotype")]
+
+heatmap_colors <- list(
+  "Cluster" = c("4" = "#984EA3",
+                "6" = "#FFFF33"),
+  "Genotype" = c("het" = "#E41A1C", "hom" = "#377EB8")#,
+#  "Age" = c("E12.5" = "black", "E14.5" = "gray")
+)
+
+#colnames(heatmap_annotation)<-c("Cluster","Genotype","Age")
+colnames(heatmap_annotation)<-c("Cluster","Genotype")
+
+#pdf("Heatmap_all_cells_wrt_genotype.pdf",height=25,width=18)
+#png("Heatmap_all_cells_wrt_genotype.png",height=15,width=20, units = "in", res = 400)
+pheatmap(mat = heatmap_data,
+         scale="none",
+         show_rownames = TRUE,
+         show_colnames = FALSE,
+         drop_levels = FALSE,
+         cluster_rows = F,
+         cluster_cols = F,
+         color = colorRampPalette(colors = c("#377EB8", "white", "#E41A1C"))(100),
+         #breaks=seq(myLower, myUpper, length = 100),
+         #breaks = seq(0, 2.8, length = 200),
+         annotation_col = heatmap_annotation,
+         annotation_colors = heatmap_colors,
+         annotation_names_col = TRUE,
+         annotation_legend = TRUE,
+         fontsize = 7,
+         fontsize_row = 6#,
+         #treeheight_col = 0,
+         #treeheight_row = 0,
+         #main = "All Cells\n254 Genes, 1% FDR\nFull model: ~ genotype + batch  + sex + cell type\nReduced model: ~ batch + sex + cell type"
+         )
+#dev.off()
+
+```
+
 
 # Cluster Specificity
 ```{r specificity}
@@ -551,82 +661,94 @@ cluster_specificity <- cummeRbund:::.specificity(mean_expr_cluster)
 melted_cluster_specificity <- melt(cluster_specificity)
 mean_expr_cluster_melted <- melt(mean_expr_cluster)
 names(mean_expr_cluster_melted) <- c("cluster","mean_expr")
-mean_expr_cluster_melted$gene_id <- rep(row.names(mean_expr_cluster), 11)
+mean_expr_cluster_melted$gene_id <- rep(row.names(mean_expr_cluster), nlevels(pData(dat.filtered)$cluster))
 melted_cluster_specificity$Var2 <- as.numeric(str_replace(melted_cluster_specificity$Var2, pattern = "_spec", replacement = ""))
 names(melted_cluster_specificity) <- c("gene_id", "cluster", "specificity")
-cluster_specificity <- merge(melted_cluster_specificity, mean_expr_cluster_melted, by = c("gene_id", "cluster"))
-cluster_specificity$gene_short_name <- lookupGeneName(dat.filtered, as.character(cluster_specificity$gene_id), unique = F)
-
-ggplot(cluster_specificity) +
-  geom_point(aes(x = log10(mean_expr + 1), y = specificity)) +
-  geom_smooth(aes(x = log10(mean_expr + 1), y = specificity)) +
-  facet_wrap(~ cluster) +
-  ggtitle("Specificity by Cluster")
-
-
-ggplot(cluster_specificity, aes(x = log10(mean_expr + 1), y = specificity, label = ifelse(cluster_specificity$specificity > 0.2 & log10(cluster_specificity$mean_expr + 1) > 0.1, cluster_specificity$gene_short_name, ""))) +
-  geom_point() +
-  geom_smooth() +
-  geom_text() +
-  facet_wrap(~ cluster) +
-  ggtitle("Specificity by Cluster")
-
-
-for(i in 1:11){
-  tmp <- cluster_specificity[cluster_specificity$cluster == i, ]
-  
-  p <- ggplot(tmp, aes(x = log10(mean_expr + 1), y = specificity, label = ifelse(tmp$specificity > 0.2 & log10(tmp$mean_expr + 1) > 0.1, tmp$gene_short_name, ""))) +
-    geom_point() +
-    geom_smooth() +
-    geom_text(nudge_y = 0.015) +
-    ggtitle(paste("Specificity for Cluster", i))
-  print(p)
-}
-
-tmp <- cluster_specificity[cluster_specificity$cluster == 8,]
-
-ggplot(tmp, aes(x = log10(mean_expr + 1), y = specificity, label = ifelse(tmp$specificity > 0.2 & log10(tmp$mean_expr + 1) > 0.1, tmp$gene_short_name, ""))) +
-  geom_point() +
-  geom_smooth() +
-  geom_text(nudge_y = 0.015) +
-  ggtitle("Specificity for cluster 8")
+melted_df <- merge(melted_cluster_specificity, mean_expr_cluster_melted, by = c("gene_id", "cluster"))
+melted_df$gene_short_name <- lookupGeneName(dat.filtered, as.character(melted_df$gene_id), unique = F)
 
 #cluster 2 is mixed cluster
 #Do GO enrichment for genes specific to cluster 6
 #What are the genes specific to clusters 9 and 10?
 
-cluster_specificity$gene_short_name <- lookupGeneName(dat.filtered, cluster_specificity$gene_id)
+index <- apply(cluster_specificity, 1, which.max)
+gene_specificity <- list()
+for(i in 1:nlevels(pData(dat.filtered)$cluster)){
+  gene_specificity[[i]] <- lookupGeneName(dat.filtered, names(index[index == i]))
+}
 
-cluster_specific_genes <- cluster_specificity %>%
-  filter(specificity > 0.5, mean_expr > 1, gene_id %in% expressed_genes)
+genes <- list()
+genes[[1]] <- c("Igf1", "Aurka", "Aurkb", "Top2a", "Ube2c", "Hist1h2ai", "Hist1h2ap", "Hist1h2ah", "Epcam", "Ccnb1", "Cdk1", "Sox10", "Hist1h2ao", "Ccna2")
+genes[[2]] <- c("Sox6", "Notch2", "Mast4")
+genes[[3]] <- c("Cdc20", "Cenpa", "Cenpf", "Ccn2", "Hoxa2")
+genes[[4]] <- c("Lancl3", "Tac1", "Ecel1", "Chgb", "Mapt", "Stmn2", "Stmn3", "Rtn1", "Meg3", "Gabrg3", "Ache", "Npy", "Myl1", "Snap25")
+genes[[5]] <- c("Nos1", "Ntng1", "Nrg1", "Etv1", "Sncg", "Gal", "Ass1", "Tubb3", "Elavl4", "Kcnab1")
+genes[[6]] <- c("H2-Ab1", "Irgm1", "Arg1", "Cck", "Apoe", "Pantr1", "Grp", "St18", "Dll1", "Dll3")
+genes[[7]] <- c("Tagln", "Myl9", "Postn", "Plp1", "Gas1", "Mest", "Ednrb", "Fabp7")
+genes[[8]] <- c("Hoxc10", "Hoxa10", "Hoxa7", "Hoxc9", "Hoxa9", "Hand1", "Gata2", "Gfra3", "Agtr2", "Cartpt", "Th", "Dbh", "Nefl", "Isl1", "Pmp22", "Slc18a3")
 
-cluster_specific_genes$gene_short_name <- lookupGeneName(dat.filtered, cluster_specific_genes$gene_id)
 
-cluster_specific_genes <- cluster_specific_genes %>%
-  select(gene_id, gene_short_name, cluster, specificity, mean_expr)
+for(i in 1:nlevels(pData(dat.filtered)$cluster)){
+  print(paste("Cluster", i))
+  print(genes[[i]][!genes[[i]] %in% gene_specificity[[i]]])
+}
 
-cluster_specific_genes <- cluster_specific_genes[order(cluster_specific_genes$cluster),]
 
-```
+plot_specificity <- function(x){
+  ggplot(melted_df[melted_df$cluster == x,], aes(x = log10(mean_expr + 1), 
+                                        y = specificity, 
+                                        label = ifelse(melted_df[melted_df$cluster == x,]$gene_short_name %in% genes[[x]],
+                                                       melted_df[melted_df$cluster == x,]$gene_short_name, 
+                                                       ""), 
+                                        color = ifelse(ifelse(melted_df[melted_df$cluster == x,]$gene_short_name %in% genes[[x]],
+                                                       melted_df[melted_df$cluster == x,]$gene_short_name, 
+                                                       "") == "", "no", "yes"), 
+                                        alpha = ifelse(ifelse(melted_df[melted_df$cluster == x,]$gene_short_name %in% genes[[x]],
+                                                       melted_df[melted_df$cluster == x,]$gene_short_name, 
+                                                       "") == "", 0.1, 1))) +
+#  ggtitle(paste("Cluster", x)) +
+      geom_point(size = 0.5) +
+      geom_smooth(lwd = 0.2, color = "red") +
+      scale_color_manual(values = c("no" = "black", "yes" = "red")) +
+      scale_x_continuous("log10(mean expression + 1)", expand = c(0,0), limits = c(0, 3.5)) +
+      scale_y_continuous("Specificity", expand = c(0,0), limits = c(0,1)) +
+      geom_text(size = 1.4, 
+                hjust = 0, 
+                vjust = 0, 
+                nudge_x = 0.03, 
+                nudge_y = -0.005, 
+                color = "black") +
+      theme(legend.position = "none",
+            plot.title = element_text(size = 10, hjust = 0.005, vjust = -6, face = "plain"),
+            plot.margin = margin(-10, 2, 2, 2),
+            axis.title = element_text(size= 8),
+            axis.title.x = element_text(margin = margin(t = 0)),
+            axis.title.y = element_text(margin = margin(r = 0)),
+            axis.text = element_text(size = 6),
+            #axis.title = element_blank(),
+            #axis.text = element_blank(),
+            aspect.ratio = 1
+            )
+}
 
-```{r DE_wrt_cluster}
-# Get genes DE wrt cluster then re-make Umap with these genes
-cluster_diff_test <- differentialGeneTest(vagal_dat.filtered[expressed_genes,],fullModelFormulaStr = "~batch + num_genes_expressed + cluster",reducedModelFormulaStr = "~batch + num_genes_expressed")
 
-cluster_diff_test_sorted <- cluster_diff_test[order(cluster_diff_test$qval),]
+plot_specificity(4) + ggtitle("Cluster 4: Ache+")
+plot_specificity(5) + ggtitle("Cluster 5: Nos1+")
+plot_specificity(7) + ggtitle("Cluster 7: Maturing Glia")
+plot_specificity(8) + ggtitle("Cluster 8: Th+, Dbh+")
+p2 <- plot_specificity(2)
+p3 <- plot_specificity(3)
+p4 <- plot_specificity(4)
+p5 <- plot_specificity(5)
+p6 <- plot_specificity(6)
+p7 <- plot_specificity(7)
+p8 <- plot_specificity(8)
 
-cluster_DE_genes <- rownames(cluster_diff_test_sorted[1:500,])
+pg1 <- cowplot::plot_grid(p1, p3, p5, p7, rel_widths = 1, ncol = 1)
+pg2 <- cowplot::plot_grid(p2, p4, p6, p8, rel_widths = 1, ncol = 1)
 
-#embedding <- umap(t(log10(exprs(vagal_dat.filtered.expressed.normalized[cluster_DE_genes,]) + 1)), n_neighbors = 20L, random_state = 100L, min_dist = .001, spread = 15, n_epochs = 5000)
+cowplot::plot_grid(pg1, pg2, ncol = 2)      
 
-embedding <- umap(t(log10(exprs(vagal_dat.filtered.expressed.normalized[cluster_DE_genes,]) + 1)), n_neighbors = 30L, random_state = 100L, n_epochs = 5000, min_dist = 0.001, spread = 10)
+grid.arrange(p1, p2, p3, p4, p5, p6, p7, p8, ncol = 2)
 
-pData(vagal_dat.filtered.expressed.normalized)$UMAP1 <- embedding$UMAP1
-pData(vagal_dat.filtered.expressed.normalized)$UMAP2 <- embedding$UMAP2
-
-ggplot(pData(vagal_dat.filtered.expressed.normalized), aes(x = UMAP1, y = UMAP2, color = CellType)) +
-  geom_point(size = 1) +
-  scale_color_brewer(palette = "Set1") +
-  theme_classic() +
-  ggtitle("Umap on 500 genes DE wrt cluster")
 ```
