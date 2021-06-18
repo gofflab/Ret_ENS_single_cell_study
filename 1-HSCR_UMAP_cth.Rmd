@@ -231,11 +231,6 @@ ggplot(pData(dat.filtered.expressed.normalized), aes(x = UMAP1, y = UMAP2, color
 
 pData(dat.filtered)$UMAP1 <- embedding$UMAP1
 pData(dat.filtered)$UMAP2 <- embedding$UMAP2
-
-ggplot(pData(dat.filtered)) + 
-  geom_point(aes(x = UMAP1,y = UMAP2, col = CellType)) +
-  scale_color_brewer("Cell Type", palette = "Set1") +
-  theme(legend.position = c(0.5, 0.15), legend.text = element_text(size = 18), legend.title = element_text(size = 20))
 ```
 
 ```{r plot_by_condition}
@@ -312,66 +307,99 @@ ggplot(pData(dat.filtered)) +
 dev.off()
 ```
 
-## Build the Cell Type Hierarchy
-```{r}
-cth<-newCellTypeHierarchy() 
 
-cth<-addCellType(cth,"Neuron",classify_func=function(x){ x[lookupGeneId(dat.filtered.expressed.normalized,"Snap25"),] > 50 | x[lookupGeneId(dat.filtered.expressed.normalized,"Nefl"),] > 90 | x[lookupGeneId(dat.filtered.expressed.normalized,"Rtn1"),] > 50 | x[lookupGeneId(dat.filtered.expressed.normalized,"Vip"),] > 60 | x[lookupGeneId(dat.filtered.expressed.normalized,"Tubb3"),] > 160 | x[lookupGeneId(dat.filtered.expressed.normalized,"Nefh"),] > 1 | x[lookupGeneId(dat.filtered.expressed.normalized,"Elavl3"),] > 6 | x[lookupGeneId(dat.filtered.expressed.normalized,"Elavl4"),] > 200 })
+```{r celltype_classifier}
+model <- readRDS("../Linnarsson_enteric_data/RFmodel_subset.rds")
 
-cth<-addCellType(cth,"Noradrenergic Neuron",parent_cell_type_name = "Neuron",classify_func=function(x){ x[lookupGeneId(dat.filtered.expressed.normalized,"Isl1"),] > 10 & x[lookupGeneId(dat.filtered.expressed.normalized,"Dbh"),] > 40})
+test_dat <- t(projection70$projection)
+test_dat <- apply(test_dat, 2, function(x){ (x-mean(x))/sd(x)})
 
-cth<-addCellType(cth,"Acetylcholinergic Neuron",parent_cell_type_name = "Neuron",classify_func=function(x){ (x[lookupGeneId(dat.filtered.expressed.normalized,"Ache"),] > 1 & x[lookupGeneId(dat.filtered.expressed.normalized,"Slc18a3"),] > 0)})
+pData(dat.filtered)$celltype_pred <- predict(model, newdata = test_dat)
+table(pData(dat.filtered)$celltype_pred) # No cells classified as ENMFB
+pData(dat.filtered)$parentCelltype <- ifelse(str_detect(pData(dat.filtered)$celltype_pred, "ENTG"), "progenitor/glia", "neuron")
 
-cth<-addCellType(cth,"Progenitor/Glia",classify_func=function(x){ x[lookupGeneId(dat.filtered.expressed.normalized,"Tubb3"),] < 30  | x[lookupGeneId(dat.filtered.expressed.normalized,"Fabp7"),]  > 30 })
+pdf("parentcelltype_classification.pdf", height = 2, width = 2, useDingbats = F)
+plotUMAP(dat.filtered, color = "parentCelltype", size = 0.1) +
+  scale_color_manual("Cell Type", values = cbPalette[1:2]) +
+    theme(aspect.ratio = 1,
+        plot.title = element_text(size = 6, face = "plain", hjust = 0.01, margin = margin(b = -12)),
+        strip.background = element_blank(), 
+        strip.text = element_blank(), 
+        axis.title = element_text(size = 6),
+        axis.title.x = element_text(margin = margin(t = -1)),
+        axis.title.y = element_text(margin = margin(r = -1)),
+        axis.text = element_text(size = 6),
+        axis.text.x = element_text(margin = margin(t = -1)),
+        axis.text.y = element_text(margin = margin(r = -1)),
+        axis.ticks = element_blank(),
+        legend.position = c(0.6, 0.2),
+        legend.background = element_blank(),
+        legend.key.height = unit(7, "pt"),
+        legend.key.width = unit(5, "pt"),
+        legend.text = element_text(size = 6),
+        legend.title = element_text(size = 8)
+        ) 
+dev.off()
 
-dat.filtered.expressed.normalized <- classifyCells(dat.filtered.expressed.normalized, cth, method = "markers-only")
+pdf("Cluster_proportion_celltype.pdf", height = 3, width = 3, useDingbats = F)
+ggplot(pData(dat.filtered)) + 
+  geom_bar(aes(x = cluster, fill = parentCelltype), position = "fill") + 
+  geom_hline(aes(yintercept = 0.1), linetype = "dashed", col = "grey20") +
+  geom_hline(aes(yintercept = 0.9), linetype = "dashed", col = "grey20") +
+  scale_fill_manual(values = cbPalette[1:2], guide = F) +
+  scale_y_continuous("Proportion", expand = c(0,0), breaks = c(0, 0.1, 0.25, 0.5, 0.75, 0.9, 1)) +
+  scale_x_discrete("Cluster") +
+  theme(plot.margin = margin(6, 0, -10, 0),
+        axis.ticks.x = element_blank(), 
+        axis.text = element_text(size = 6),
+        axis.text.x = element_text(vjust = 2),
+        axis.title = element_text(size = 8),
+        axis.title.x = element_text(vjust = 4),
+        axis.title.y = element_text(vjust = 0)) +
+  monocle:::monocle_theme_opts()
+dev.off()
 
-pData(dat.filtered)$CellType <- pData(dat.filtered.expressed.normalized)$CellType
+pData(dat.filtered)$celltype <- 
+apply(pData(dat.filtered), 1, function(x){
+if(x[["cluster"]] %in% c(1:5)){
+  "progenitor/glia"
+}else if(x[["cluster"]] %in% c(7, 8)){
+  "neuron"
+} else(
+  x[["parentCelltype"]]
+)})
 
-ggplot(pData(dat.filtered), aes(x = UMAP1, y = UMAP2, color = CellType)) +
-  geom_point() +
-  scale_color_manual(values = c("#E41A1C", "#F781BF", "#377EB8", "#4DAF4A", "#984EA3", "#999999")) +
-  theme_bw() +
-  ggtitle("Umap on 419 genes post-normalization\nAnnotation based on normalized expression values only")
+plotUMAP(dat.filtered, color = "celltype") +
+  scale_color_manual(values = cbPalette[1:2]) +
+  theme(aspect.ratio = 1)
 
-pData(dat.filtered)[pData(dat.filtered)$cluster == 8, "CellType"] <- "Noradrenergic Neuron"
-pData(dat.filtered)[pData(dat.filtered)$cluster == 4 & pData(dat.filtered)$CellType %in% c("Unknown", "Ambiguous"), "CellType"] <- "Neuron"
+#Etv1, Gal, Nos1, Vip = Branch A = inhibitory MNs
+grid.arrange(plotUMAP(dat.filtered, markers = c("Etv1", "Gal", "Nos1", "Vip")),
+             plotUMAP(dat.filtered, color = "cluster"),
+             nrow = 1)
 
-pData(dat.filtered)[pData(dat.filtered)$cluster %in% c(1, 3, 7) & pData(dat.filtered)$CellType %in% c("Unknown", "Ambiguous"), "CellType"] <- "Progenitor/Glia"
+#Bnc2, Dlx5, Mgat4c, Ndufa4l2 = Branch B = excitatory MNs
+grid.arrange(plotUMAP(dat.filtered, markers = c("Bnc2", "Dlx5", "Mgat4c", "Ndufa4l2")),
+             plotUMAP(dat.filtered, color = "cluster"),
+             nrow = 1)
 
-levels(pData(dat.filtered)$CellType) <- c(levels(pData(dat.filtered)$CellType), "Transition Cell")
-pData(dat.filtered)[pData(dat.filtered)$CellType%in% c("Unknown", "Ambiguous"), "CellType"] <- "Transition Cell"
+grid.arrange(plotUMAP(dat.filtered, markers = "Plp1"),
+             plotUMAP(dat.filtered, color = "cluster"),
+             nrow = 1)
 
-ggplot(pData(dat.filtered), aes(x = UMAP1, y = UMAP2, color = CellType)) +
-  geom_point() +
-  scale_color_brewer(palette = "Set1") +
-  theme_classic() +
-  ggtitle("Umap on 419 genes post-normalization\nAnnotation post-imputation")
+pData(dat.filtered)$celltype <- 
+apply(pData(dat.filtered), 1, function(x){
+if(x[["cluster"]] == 7){
+  "inhibitory motor neuron"
+}else if(x[["cluster"]] == 8){
+  "excitatory motor neuron"
+} else(
+  x[["celltype"]]
+)})
 
-pData(dat.filtered.expressed.normalized)$CellType <- pData(dat.filtered)$CellType
 
-tmp_df <- pData(dat.filtered) %>%
-  mutate(condition = paste(age, genotype, sex)) %>% dplyr::select(condition, CellType) %>% table(.) %>% as.data.frame(.) %>% dcast(formula = condition ~ CellType)
 
-rownames(tmp_df) <- tmp_df[,1]
-
-tmp_df <- tmp_df[,c(-1, -3, -7)]
-
-tmp_df <- as.data.frame(apply(tmp_df, 1, function(x){x/sum(x)}))
-
-tmp_df$CellType <- rownames(tmp_df)
-
-tmp_df <- melt(tmp_df)
-
-labels <- unique(tmp_df$variable)
-labels <- str_replace_all(labels, " ", "\n")
-
-ggplot(tmp_df) + 
-  geom_col(aes(x = variable, y = value, fill = CellType), width = 0.7, position = "dodge") +
-  scale_fill_brewer("Cell Type", palette = "Set1") + 
-  scale_y_continuous("Proportion", expand = c(0,0)) + 
-  scale_x_discrete(labels = labels) +
-  theme(legend.position = c(0.66, 0.86), axis.title.x = element_blank())
+plotUMAP(dat.filtered, color = "celltype")
 ```
 
 ```{r,include=F,eval=F}
