@@ -30,6 +30,7 @@ colnames(np25.gapsResult@featureLoadings) <- paste0("Pattern_", c(1:25))
 colnames(np25.gapsResult@featureStdDev) <- paste0("Pattern_", c(1:25))
 
 saveRDS(np25.gapsResult, "HSCR_np25.rds")
+np25.gapsResult <- readRDS("HSCR_np25.rds")
 ```
 
 ```{r UMAP_by_pattern_weight}
@@ -57,12 +58,15 @@ np25cor <- cor(np25.gapsResult@sampleFactors)
 plot(as.dendrogram(hclust(dist(t(np25cor)))))
 
 #One-hot encode numeric traits
+
 tmp <- pData(dat.filtered)[,c("genotype", "sex", "age")]
-tmp2 <- pData(dat.filtered)[,c("final_celltype", "batch", "cluster")]
-tmp2 <-mutate(tmp2, condition = paste(tmp$age, tmp$genotype, tmp$sex))
 tmp$genotype <- ifelse(tmp$genotype == "het", 0, 1)
 tmp$sex <- ifelse(tmp$sex == "male", 0, 1)
 tmp$age <- ifelse(tmp$age == "E12.5", 0, 1)
+
+tmp2 <- pData(dat.filtered) %>% 
+  mutate(condition = paste(age, genotype, sex)) %>%
+  select(celltype, batch, cluster, condition)
 
 library(caret)
 dmy <- caret::dummyVars("~.", data = tmp2)
@@ -81,19 +85,22 @@ pmat <- pmat[rownames(np25.cor), colnames(np25.cor)] # subset & make sure they'r
 
 cutoff <- .05/(dim(np25.cor)[1]*dim(np25.cor)[2])
 
-tmp <- melt(np25.cor)
-tmp2 <- melt(pmat)
-tmp3 <- merge(tmp, tmp2, by = c("Var1", "Var2"))
+#tmp <- melt(np25.cor)
+#tmp2 <- melt(pmat)
+tmp3 <- merge(melt(np25.cor), melt(pmat), by = c("Var1", "Var2"))
 names(tmp3) <- c("metadata", "pattern", "correlation", "pvalue")
 
 meta_meta <- as.data.frame(colnames(cor_meta))
 colnames(meta_meta) <- "metadata"
-meta_meta$label <- c("Genotype", "Sex", "Age", "Acetylcholinergic Neuron", "Neuron", "Nitrergic Neuron", "Noradrenergic Neuron", "Progenitor/Glia", "Transition Cell", "Batch 1", "Batch 2", "Batch 3", "Batch 4", "Batch 5", "Cluster 1", "Cluster 2", "Cluster 3", "Cluster 4", "Cluster 5", "Cluster 6", "Cluster 7", "Cluster 8", "E12.5 Het F", "E12.5 Het M", "E12.5 Hom F", "E12.5 Hom M", "E14.5 Het F", "E14.5 Het M", "E14.5 Hom F", "E14.5 Hom M", "Total mRNA Mass", "Reads", "Alignment %", "# Genes Expr", "# mRNAs", "Mean Expr","SD Expr")
-meta_meta$category <- c(rep("Experimental Var", 3), rep("Cell Type", 6), rep("Batch", 5), rep("Cluster", 8), rep("Condition", 8), rep("Technical Vars", 7))
-meta_meta$category <- factor(meta_meta$category, levels(as.factor(meta_meta$category))[c(5, 4, 2, 3, 6, 1)])
+meta_meta$label <- c("Genotype", "Sex", "Age", "Progenitor/Glia", "Neuron", "Inhibitory MN", "Excitatory MN", "Batch 1", "Batch 2", "Batch 3", "Batch 4", "Batch 5", "Cluster 1", "Cluster 2", "Cluster 3", "Cluster 4", "Cluster 5", "Cluster 6", "Cluster 7", "Cluster 8", "Cluster 9", "E12.5 Het F", "E12.5 Het M", "E12.5 Hom F", "E12.5 Hom M", "E14.5 Het F", "E14.5 Het M", "E14.5 Hom F", "E14.5 Hom M", "Total mRNA Mass", "Reads", "Alignment %", "# Genes Expr", "# mRNAs", "Mean Expr","SD Expr")
+meta_meta$category <- c(rep("Experimental Var", 3), rep("Cell Type", 4), rep("Batch", 5), rep("Cluster", 9), rep("Condition", 8), rep("Technical Vars", 7))
+meta_meta$category <- factor(meta_meta$category, levels = c("Experimental Var", "Condition", "Cell Type", "Cluster", "Technical Vars", "Batch"))
 meta_meta <- meta_meta[match(rownames(np25.cor), as.character(meta_meta$metadata)),]
 meta_meta <- meta_meta[order(meta_meta$category),]
-meta_meta$y <- c(1:37)
+meta_meta$y <- seq(1, nrow(meta_meta))
+
+tmp3$metadata <- as.character(tmp3$metadata)
+meta_meta$metadata <- as.character(meta_meta$metadata)
 
 tmp4 <- merge(tmp3, meta_meta, by = "metadata")
 
@@ -256,69 +263,150 @@ ENSEMBLToGO <- ENSEMBLToGO[sapply(ENSEMBLToGO,length)<=100]
 
 np25_CGstats <- calcCoGAPSStat(np25.gapsResult, GStoGenes = ENSEMBLToGO, numPerm = 1000)
 
-write.csv(CGstats,file=paste("CoGAPSStat.",gsName,".",AName,"nP",dim(Aneu)[2],".csv",sep=""))#,col.names=c("GSDownreg","GSUpreg"))
+saveRDS(np25_CGstats, "np25_CGstats.rds")
+
+write.csv(np25_CGstats,file=paste("CoGAPSStat.expressed_genes.HSCR.nP25.csv",sep=""))#,col.names=c("GSDownreg","GSUpreg"))
   ls("package:KEGG.db")
-significantTerms <- function(np){
-  GOTerms = list()
-  assign("CGstats", get(paste0("np", np, "_CGstats")))
-for(i in 1:np){
-  GSDownreg = stack(sort(CGstats$GSDownreg[i,])[sort(CGstats$GSDownreg[i,]) < 0.05])
+  
+GOTerms = list()
+for(i in 1:25){
+  GSDownreg = stack(sort(np25_CGstats$GSDownreg[i,])[sort(np25_CGstats$GSDownreg[i,]) < 0.05])
   colnames(GSDownreg) = c("pval", "GOID")
   Term = AnnotationDbi::select(GO.db, keys = as.character(GSDownreg$GOID), column = 'TERM', keytype = 'GOID')
   GSDownreg = merge(GSDownreg, Term, by = "GOID", sort = F)
   
-  GSUpreg = stack(sort(CGstats$GSUpreg[i,])[sort(CGstats$GSUpreg[i,]) < 0.05])
+  GSUpreg = stack(sort(np25_CGstats$GSUpreg[i,])[sort(np25_CGstats$GSUpreg[i,]) < 0.05])
   colnames(GSUpreg) = c("pval", "GOID")
   Term = AnnotationDbi::select(GO.db, keys = as.character(GSUpreg$GOID), column = 'TERM', keytype = 'GOID')
   GSUpreg = merge(GSUpreg, Term, by = "GOID", sort = F)
   
   GOTerms[[paste0("Patt", i)]] = list("Downreg" = GSDownreg, "Upreg" = GSUpreg)
 }
-  return(GOTerms)
+
+saveRDS(GOTerms, "np25_GOTerms.rds")
+
+tmp <- lapply(GOTerms, function(x){
+    x[[1]][,"TERM"]
+  })
+
+nrow <- max(unlist(lapply(tmp, length)))
+mat <- matrix(NA, nrow = nrow, ncol = 25)
+
+for(i in 1:25){
+  mat[,i] <- c(tmp[[i]], 
+               rep("", nrow - length(tmp[[i]])))
 }
 
-np25_GOTerms <- significantTerms(25)
+mat <- as.data.frame(mat)
+names(mat) <- paste0("pattern_", seq(1:25))
+write_excel_csv(mat, path = "HSCR_np25_GOTerms_Downreg.csv")
 
-top50genes <- apply(np20.gapsResult@featureLoadings, 2, function(x){lookupGeneName(dat.filtered, rownames(np20.gapsResult@featureLoadings[order(x, decreasing = T),])[1:50])})
+tmp <- lapply(GOTerms, function(x){
+    x[[2]][,"TERM"]
+  })
 
+nrow <- max(unlist(lapply(tmp, length)))
+mat <- matrix(NA, nrow = nrow, ncol = 25)
 
+for(i in 1:25){
+  mat[,i] <- c(tmp[[i]], 
+               rep("", nrow - length(tmp[[i]])))
+}
 
+mat <- as.data.frame(mat)
+names(mat) <- paste0("pattern_", seq(1:25))
+write_excel_csv(mat, path = "HSCR_np25_GOTerms_Upreg.csv")
 ```
-#Check this section
-```{r corr_plot_GOTerms}
-Upreg_sigTerms <- np20_CGstats$GSUpreg[,apply(np20_CGstats$GSUpreg, 2, function(x){sum(x < 0.05) > 0})] #subset terms significant (p < 0.05) in at least 1 pattern
 
-Downreg_sigTerms <- np20_CGstats$GSDownreg[,apply(np20_CGstats$GSDownreg, 2, function(x){sum(x < 0.05) > 0})] #subset terms significant (p < 0.05) in at least 1 pattern
+```{r clusterProfiler_highrank}
+markers <- list()
 
-Upreg_sigTerms_clustered <- Upreg_sigTerms[order.dendrogram(as.dendrogram(hclust(dist(Upreg_sigTerms)))), order.dendrogram(as.dendrogram(hclust(dist(t(Upreg_sigTerms)))))]
+apply(np25patternMarkers$PatternMarkerScores, 2, function(x){
+  sum(x < 1.2)
+})
 
-Upreg_sigTerms_clustered <- t(Upreg_sigTerms_clustered)
+for(i in 1:25){
+  pattern_scores <- np25patternMarkers$PatternMarkerScores[,i,drop = F]
+  index <- which(pattern_scores < 1.2)
+  genes <- rownames(pattern_scores)[index]
+  markers[[i]] <- genes
+}
 
-Upreg_sigTerms_TERM <- AnnotationDbi::select(GO.db, keys = as.character(rownames(Upreg_sigTerms_clustered)), column = 'TERM', keytype = 'GOID')
+names(markers) <- paste0("pattern_", seq(1, 25, 1))
 
-Upreg_names <- paste(Upreg_sigTerms_TERM$GOID, Upreg_sigTerms_TERM$TERM)
+m <- lapply(markers, function(x){match(x, egENSEMBL$ensembl_id)})
+marker_list <- lapply(m, function(x){egENSEMBL$gene_id[x]})
+marker_list <- lapply(marker_list, function(x){x[!is.na(x)]}) #rm NA
 
-Upreg_corrplot_obj <- Upreg_sigTerms_clustered
-rownames(Upreg_corrplot_obj) <- Upreg_names
+marker_list <- marker_list[lapply(marker_list, length) > 10] # set min length to 10
+marker_list <- lapply(marker_list, function(x){ # set max length to 100
+  if(length(x) > 100){
+    x <- x[1:100]
+  }
+  return(x)
+})
 
-Downreg_sigTerms_clustered <- Downreg_sigTerms[order.dendrogram(as.dendrogram(hclust(dist(Downreg_sigTerms)))), order.dendrogram(as.dendrogram(hclust(dist(t(Downreg_sigTerms)))))]
+library(clusterProfiler)
+ego_markers_np25 <- lapply(marker_list, function(x){
+  enrichGO(gene = x,
+                OrgDb =       'org.Mm.eg.db',
+                ont           = "BP",
+                pAdjustMethod = "BH",
+                pvalueCutoff  = 0.05,
+                qvalueCutoff  = 1, 
+                readable      = TRUE)
+})
 
-Downreg_sigTerms_clustered <- t(Downreg_sigTerms_clustered)
 
-Downreg_sigTerms_TERM <- AnnotationDbi::select(GO.db, keys = as.character(rownames(Downreg_sigTerms_clustered)), column = 'TERM', keytype = 'GOID')
+lapply(ego_markers_np25, function(x){
+  head(x$Description)
+})
 
-Downreg_names <- paste(Downreg_sigTerms_TERM$GOID, Downreg_sigTerms_TERM$TERM)
+saveRDS(ego_markers_np25, "ego_markers_np25.rds")
+```
 
-Downreg_corrplot_obj <- Downreg_sigTerms_clustered
-rownames(Downreg_corrplot_obj) <- Downreg_names
+```{r}
 
-pdf("Upreg_corplot.pdf", height = 600, width = 20)
-corrplot(Upreg_corrplot_obj, col = "#053061", tl.col = "black", tl.srt = 45, method = "color", addgrid.col = "grey20", p.mat = Upreg_corrplot_obj, sig.level = 0.05, insig = "blank", bg = "grey80", tl.cex = 1)
-dev.off()
+# < 100 markger genes
+# 6, 10, 13, 14, 16, 18, 20, 23
+# < 3 GO terms
+index <- c(6, 10, 13, 20, 23)
+markers_subset <- list()
 
-pdf("Downreg_corplot.pdf", height = 500, width = 20)
-corrplot(Downreg_corrplot_obj, col = "#67001F", tl.col = "black", tl.srt = 45, method = "color", addgrid.col = "grey20", p.mat = Downreg_corrplot_obj, sig.level = 0.05, insig = "blank", bg = "grey80")
-dev.off()
+#subset to top 120 prior to converting to ENSEMBL ID to save computational time
+#subset to 100 after conversion -- not all transcripts map to ENSEMBL IDs
+j <- 1
+for(i in index){
+  pattern_scores <- np25patternMarkers$PatternMarkerScores[,i,drop = F]
+  pattern_scores <- pattern_scores[order(pattern_scores),,drop = F]
+  genes <- rownames(pattern_scores)[1:200] #top 200 genes for each pattern
+  markers_subset[[j]] <- genes
+  j=j+1
+}
+
+names(markers_subset) <- paste0("pattern_", index)
+
+m <- lapply(markers_subset, function(x){match(x, egENSEMBL$ensembl_id)})
+marker_subset_list <- lapply(m, function(x){egENSEMBL$gene_id[x]})
+marker_subset_list <- lapply(marker_subset_list, function(x){x[!is.na(x)]}) #rm NA
+marker_subset_list <- 
+  lapply(marker_subset_list, function(x){x[1:100]}) #top 50 genes for each pattern
+
+ego_markers_subset_np25 <- lapply(marker_subset_list, function(x){
+  enrichGO(gene = x,
+                OrgDb =       'org.Mm.eg.db',
+                ont           = "BP",
+                pAdjustMethod = "BH",
+                pvalueCutoff  = 0.05,
+                qvalueCutoff  = 1, 
+                readable      = TRUE)
+})
+
+saveRDS(ego_markers_subset_np25, "ego_markers_subset_np25.rds")
+
+lapply(ego_markers_subset_np25, function(x){
+  head(x$Description)
+})
 ```
 
 ```{r Linnarsson_projectR_np70}
@@ -399,67 +487,6 @@ dev.off()
 
 ```
 
-```{r HSCR_Linnarsson_pattern_corr}
-#correlate HSCR patterns with Linnarsson patterns
-genes <- rownames(linnarsson_gapsresult@featureLoadings)[rownames(linnarsson_gapsresult@featureLoadings) %in% rownames(np25.gapsResult@featureLoadings)]
-
-mat1 <- linnarsson_gapsresult@featureLoadings[genes,]
-mat2 <- np25.gapsResult@featureLoadings[genes,]
-
-patterns.cor <- cor(mat1, mat2)
-rownames(patterns.cor) <- str_remove(rownames(patterns.cor), "Pattern_")
-colnames(patterns.cor) <- str_remove(colnames(patterns.cor), "Pattern_")
-#patterns.cor <- patterns.cor[order.dendrogram(as.dendrogram(hclust(dist(patterns.cor)))),]
-pmat.patterns <- cor.mtest(merge(mat1, mat2, by = 0)[,-1])
-pmat.patterns <- pmat.patterns$p[1:70, 71:95]
-rownames(pmat.patterns) <- rownames(patterns.cor)
-colnames(pmat.patterns) <- colnames(patterns.cor)
-pmat.patterns <- pmat.patterns[rownames(patterns.cor), colnames(patterns.cor)] #reorder to match clustering of corr matrix
-
-cutoff <- .05/(nrow(pmat.patterns)*ncol(pmat.patterns))
-
-tmp <- melt(patterns.cor)
-tmp2 <- melt(pmat.patterns)
-tmp3 <- merge(tmp, tmp2, by = c("Var1", "Var2"))
-names(tmp3) <- c("Linnarsson_pattern", "HSCR_pattern", "correlation", "pvalue")
-
-
-pdf("Patterns_corr.pdf", width = 3, height = 7.5)
-ggplot(tmp3) +
-  geom_tile(aes(x = HSCR_pattern,
-                y = -Linnarsson_pattern,
-                fill = ifelse(tmp3$pvalue < cutoff, correlation, NA)), 
-            color = "black") +
-  scale_fill_viridis("Correlation", 
-                     na.value = "grey80", 
-                     limits = c(-1,1)) +
-  scale_x_continuous("HSCR Patterns", 
-                     expand = c(0,0),
-                     breaks = c(1:25),
-                     position = "top") +
-  scale_y_continuous("Public Data Patterns", 
-                     breaks = c(-70:-1), 
-                     labels = c(70:1),
-                     expand = c(0,0)) +
-  theme(axis.ticks = element_blank(), 
-        axis.line = element_blank(), 
-        axis.text = element_text(size = 4), 
-        axis.text.x.top = element_text(margin = margin(b = -2)),
-        axis.text.y = element_text(margin = margin(r = -2)), 
-        axis.title = element_text(size = 8),
-        axis.title.x.top = element_text(margin = margin(b = 0)),
-        axis.title.y = element_text(margin = margin(r = 1)),
-        legend.key.height = unit(6, "pt"),
-        legend.key.width = unit(25, "pt"),
-        legend.text = element_text(size = 4),
-        legend.title = element_text(size = 6, margin = margin(l = 10, t = -8)),
-        legend.position = c(0.03,-0.02),
-        legend.direction = "horizontal",
-        plot.margin = margin(2, 2, 20, 2)) +
-  coord_equal()
-dev.off()
-```
-
 ```{r projection_correlation}
 projection.cor <- cor(cor_meta, t(projection70$projection))
 projection.cor <- projection.cor[order.dendrogram(as.dendrogram(hclust(dist(projection.cor)))),]
@@ -523,10 +550,10 @@ ggplot(tmp4) +
   coord_equal()
 dev.off()
 
-ggplot(tmp4[tmp4$label %in% paste("Cluster", 1:8),]) +
+ggplot(tmp4[tmp4$label %in% paste("Cluster", 1:9),]) +
   geom_tile(aes(x = Linnarsson_pattern,
                 y = -y,
-                fill = ifelse(tmp3[tmp3$metadata %in% paste0("cluster.", 1:8), "pvalue"] < cutoff, correlation, NA)), 
+                fill = ifelse(tmp3[tmp3$metadata %in% paste0("cluster.", 1:9), "pvalue"] < cutoff, correlation, NA)), 
             color = "black") +
   scale_fill_viridis("Correlation", 
                      na.value = "grey90", 
@@ -607,227 +634,6 @@ myDat$ttest.sig <- ifelse(as.numeric(myDat$ttest.pvalue) < 0.01/25, "**", #if
        "n.s.")) #else
 ```
 
-```{r RF_classifier}
-model <- readRDS("../Linnarsson_enteric_data/RFmodel_subset.rds")
-
-test_dat <- t(projection70$projection)
-test_dat <- apply(test_dat, 2, function(x){ (x-mean(x))/sd(x)})
-
-pData(dat.filtered)$celltype_pred <- predict(model, newdata = test_dat)
-table(pData(dat.filtered)$celltype_pred) # No cells classified as ENMFB
-pData(dat.filtered)$parentCelltype <- ifelse(str_detect(pData(dat.filtered)$celltype_pred, "ENTG"), "Glia", "Neuron")
-
-pdf("new_classification.pdf", height = 2, width = 2, useDingbats = F)
-plotUMAP(dat.filtered, color = "newCelltype", size = 0.1) +
-  scale_color_manual("Cell Type", values = cbPalette[1:2]) +
-    theme(aspect.ratio = 1,
-        plot.title = element_text(size = 6, face = "plain", hjust = 0.01, margin = margin(b = -12)),
-        strip.background = element_blank(), 
-        strip.text = element_blank(), 
-        axis.title = element_text(size = 6),
-        axis.title.x = element_text(margin = margin(t = -1)),
-        axis.title.y = element_text(margin = margin(r = -1)),
-        axis.text = element_text(size = 6),
-        axis.text.x = element_text(margin = margin(t = -1)),
-        axis.text.y = element_text(margin = margin(r = -1)),
-        axis.ticks = element_blank(),
-        legend.position = c(0.6, 0.2),
-        legend.background = element_blank(),
-        legend.key.height = unit(7, "pt"),
-        legend.key.width = unit(5, "pt"),
-        legend.text = element_text(size = 6),
-        legend.title = element_text(size = 8)
-        ) 
-dev.off()
-
-pdf("Cluster_proportion_celltype.pdf", height = 3, width = 3)
-ggplot(pData(dat.filtered)) + 
-  geom_bar(aes(x = cluster, fill = parentCelltype), position = "fill") + 
-  geom_hline(aes(yintercept = 0.1), linetype = "dashed", col = "grey20") +
-  geom_hline(aes(yintercept = 0.9), linetype = "dashed", col = "grey20") +
-  scale_fill_manual(values = cbPalette[1:2], guide = F) +
-  scale_y_continuous("Proportion", expand = c(0,0), breaks = c(0, 0.1, 0.25, 0.5, 0.75, 0.9, 1)) +
-  scale_x_discrete("Cluster") +
-  theme(plot.margin = margin(6, 0, -10, 0),
-        axis.ticks.x = element_blank(), 
-        axis.text = element_text(size = 6),
-        axis.text.x = element_text(vjust = 2),
-        axis.title = element_text(size = 8),
-        axis.title.x = element_text(vjust = 4),
-        axis.title.y = element_text(vjust = 0)) +
-  monocle:::monocle_theme_opts()
-dev.off()
-
-pData(dat.filtered)$newCelltype <- 
-apply(pData(dat.filtered), 1, function(x){
-if(x[["cluster"]] %in% c(1:5)){
-  "Glia"
-}else if(x[["cluster"]] %in% c(7, 8)){
-  "Neuron"
-} else(
-  x[["parentCelltype"]]
-)})
-
-plotUMAP(dat.filtered, color = "newCelltype") +
-  scale_color_manual(values = cbPalette[1:2]) +
-  theme(aspect.ratio = 1)
-
-cluster_diff_test <- differentialGeneTest(dat.filtered[expressed_genes,],fullModelFormulaStr = "~batch + num_genes_expressed + cluster",reducedModelFormulaStr = "~batch + num_genes_expressed")
-
-cluster_diff_test_sorted <- na.omit(cluster_diff_test[order(cluster_diff_test$qval),])
-
-cluster_diff_test_sorted_sig_genes <- rownames(cluster_diff_test_sorted[cluster_diff_test_sorted$pval < 0.01/length(expressed_genes) & cluster_diff_test_sorted$mean_expr > 1,])
-
-length(cluster_diff_test_sorted_sig_genes)
-
-#tmp <- t(scale(t(exprs(dat.filtered[cluster_diff_test_sorted_sig_genes,])), scale = T, center = T))
-#heatmap_data<-log(tmp -min(tmp) + 1)
-
-heatmap_data <- apply(exprs(dat.filtered)[cluster_diff_test_sorted_sig_genes,], 1,
-                      function(x){
-                        x = log10(x - min(x) + 1)
-                      })
-
-#heatmap_data <- heatmap_data[order.dendrogram(as.dendrogram(hclust(dist(heatmap_data)))),order.dendrogram(as.dendrogram(hclust(dist(t(heatmap_data)))))]
-
-
-
-cluster_colors <- c(brewer.pal(8, "Set2"), brewer.pal(5, "Set3")[5])[pData(dat.filtered)[rownames(heatmap_data), "cluster"]]
-
-pdf("heatmap_test.pdf", width = 10, height = 4)
-heatmap(t(heatmap_data),
-        Rowv = NA,
-        ColSideColors = cluster_colors,
-        Colv = NA,
-        scale = "none",
-        labCol = NA,
-        labRow = lookupGeneName(dat.filtered, cluster_diff_test_sorted_sig_genes),
-        col = inferno(100))
-dev.off()
-#myLower <- 0
-#myUpper <- 2
-
-#heatmap_data[heatmap_data < myLower] <- myLower
-#heatmap_data[heatmap_data > myUpper] <- myUpper
-
-#colnames(heatmap_data) <- lookupGeneName(dat.filtered,colnames(heatmap_data))
-
-heatmap_annotation <- pData(dat.filtered)[,c("parentCelltype", "cluster")]
-colnames(heatmap_annotation) <- c("Cell type","Cluster")
-
-cluster_list <- c(brewer.pal(8, "Set2"), brewer.pal(5, "Set3")[5])
-names(cluster_list) <- c(1:9)
-
-heatmap_colors <- list(
-"Cell type" =  c("Glia" = "#E69F00", 
-                      "Neuron" = "#56B4E9"),
-"Cluster" = cluster_list)
-
-
-pdf("Cluster_diff_test_v1.pdf", height = 18, width = 18, useDingbats = F)
-pheatmap(mat = t(heatmap_data),
-         scale="none",
-         show_rownames = FALSE,
-         show_colnames = FALSE,
-         cellwidth = 1,
-         cellheight = 1,
-         color = inferno(100),
-         border_color = NA,
-         cutree_rows = 9,
-         annotation_col=heatmap_annotation,
-         annotation_colors=heatmap_colors,
-         fontsize_row = 8)
-#         breaks=seq(myLower,myUpper,length=100),)
-dev.off()
-
-#pData(dat.filtered)$celltype_pred_description <- NA
-#Data(dat.filtered)[pData(dat.filtered)$celltype_pred %in% c("ENT4", "ENT5", "ENT6", "ENT9"), "celltype_pred_description"] <- "Cholinergic enteric neurons"
-#pData(dat.filtered)[pData(dat.filtered)$celltype_pred %in% c("ENT1", "ENT2", "ENT3"), "celltype_pred_description"] <- "Nitrergic enteric neurons"
-#pData(dat.filtered)[pData(dat.filtered)$celltype_pred %in% c("ENT7", "ENT8"), "celltype_pred_description"] <- "Cholinergic enteric neurons, VGLUT2"
-#pData(dat.filtered)[pData(dat.filtered)$celltype_pred %in% c("ENTG1"), "celltype_pred_description"] <- "Enteric glia, proliferating"
-#pData(dat.filtered)[is.na(pData(dat.filtered)$celltype_pred_description), "celltype_pred_description"] <- "Enteric glia"
-
-#plotUMAP(dat.filtered, color = "celltype_pred_description", size = 0.1) + 
-#  scale_color_manual("Cell Type Prediction", values = cbPalette[c(1, 6, 2, 4)]) +
-#  theme(plot.title = element_text(size = 10, face = "plain", hjust = 0.02, margin = margin(b = -8)),
-#        strip.background = element_blank(), 
-#        strip.text = element_blank(), 
-#        axis.title = element_text(size = 6),
-#        axis.title.x = element_text(margin = margin(t = -2)),
-#        axis.title.y = element_text(margin = margin(r = -1)),
-#        axis.text = element_text(size = 6),
-#        axis.text.x = element_text(margin = margin(t = -2)),
-#        axis.text.y = element_text(margin = margin(r = -1)),
-#        axis.ticks = element_blank(),
-#        legend.background = element_blank(),
-#        legend.title = element_text(size = 6),
-#        legend.text = element_text(size =6),
-#        legend.position = c(0.26, 0.15),
-#        legend.key.size = unit(0.25, "cm"),
-#        aspect.ratio = 1
-#        ) 
-
-
-#pData(dat.filtered)$final_celltype <- pData(dat.filtered)$CellType
-#pData(dat.filtered)$final_celltype <- as.character(pData(dat.filtered)$final_celltype)
-#pData(dat.filtered)[pData(dat.filtered)$celltype_pred_description == "Nitrergic enteric neurons", "final_celltype"] <- "Nitrergic Neuron"
-#pData(dat.filtered)$final_celltype <- as.factor(pData(dat.filtered)$final_celltype)
-
-#plotUMAP(dat.filtered, color = "final_celltype", size = 1) +
-#  scale_color_manual(values = cbPalette[c(6, 1, 4, 3, 2, 5)]) +
-#  theme_classic() +
-#  theme(aspect.ratio = 1, legend.position = c(0.8, 0.2))
-
-#use confusion matrix to evaluate model with marker gene classification as ground truth
-#tmp <- pData(dat.filtered)[,c("CellType", "celltype_pred_description")]
-#tmp$modelCT <- ifelse(tmp$celltype_pred_description == "Enteric glia", "glia", "neuron")
-
-#tmp$markerCT <- NA
-#tmp[tmp$CellType == "Progenitor/Glia", "markerCT"] <- "glia"
-#tmp[tmp$CellType == "Transition Cell", "markerCT"] <- "transition cell"
-#tmp[is.na(tmp$markerCT),"markerCT"] <- "neuron" 
-#tmp <- tmp[tmp$markerCT != "transition cell",]
-
-#table(tmp[,c("modelCT", "markerCT")])
-
-
-#plotUMAP(dat.filtered, color = "final_celltype", size = 0.1) + 
-#  scale_color_manual("Cell Type", values = c(brewer_pal(palette = "Set1")(5)[1:2], cbPalette[4], brewer_pal(palette = "Set1")(5)[3:5])) +
-#  theme(plot.title = element_text(size = 10, face = "plain", hjust = 0.02, margin = margin(b = -8)),
-#        strip.background = element_blank(), 
-#        strip.text = element_blank(), 
-#        axis.title = element_text(size = 6),
-#        axis.title.x = element_text(margin = margin(t = -2)),
-#        axis.title.y = element_text(margin = margin(r = -1)),
-#        axis.text = element_text(size = 6),
-#        axis.text.x = element_text(margin = margin(t = -2)),
-#        axis.text.y = element_text(margin = margin(r = -1)),
-#        axis.ticks = element_blank(),
-#        legend.background = element_blank(),
-#        legend.title = element_text(size = 6),
-#        legend.text = element_text(size =6),
-#        legend.position = c(0.45, 0.2),
-#        legend.key.size = unit(0.25, "cm"),
-#        aspect.ratio = 1
-#        ) 
-
-#plotUMAP(dat.filtered, color = "CellType", size = 0.1) + 
-#  labs(color = "Marker-Based Cell Type") +
-#  theme(plot.title = element_text(size = 10, face = "plain", hjust = 0.02, margin = margin(b = -8)),
-#        strip.background = element_blank(), 
-#        strip.text = element_blank(), 
-#        axis.title = element_text(size = 6),
-#        axis.title.x = element_text(margin = margin(t = -2)),
-#        axis.title.y = element_text(margin = margin(r = -1)),
-#        axis.text = element_text(size = 6),
-#        axis.text.x = element_text(margin = margin(t = -2)),
-#        axis.text.y = element_text(margin = margin(r = -1)),
-#        axis.ticks = element_blank(),
-#        legend.background = element_blank(),
-#        legend.title = element_text(size = 6),
-#        legend.text = element_text(size =6),
-#        legend.position = c(0.45, 0.2),
-#        legend.key.size = unit(0.25, "cm"),
-#        aspect.ratio = 1
-#        ) 
+```{r}
+sessionInfo()
 ```
