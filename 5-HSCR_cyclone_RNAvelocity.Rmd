@@ -265,46 +265,49 @@ TukeyHSD(fit.G1)
 
 ```{r CC_patterns}
 CC_patterns <- list()
-CC_patterns$projection <- t(projection70$projection[paste0("Pattern_", 40:42),]) #Subset CC patterns
-CC_patterns$pval <- t(projection70$pval[paste0("Pattern_", 40:42),]) #Subset CC patterns
+CC_patterns$projection <- t(projection70$projection[paste0("Pattern_", 40:42),]) #Subset CC pattern projection weights
+CC_patterns$pval <- t(projection70$pval[paste0("Pattern_", 40:42),]) #Subset CC pattern projection pvals
 
-
-CC_patterns$projection <- apply(CC_patterns$projection, 2, function(x){ #Normalize to [0,1]
+CC_patterns$projection <- apply(CC_patterns$projection, 2, function(x){ #Normalize projection weights to [0,1]
   x=x-min(x)
   x=x/max(x)
 })
 
-CC_patterns$projection <- merge(pData(dat.filtered)[,c("cell_id", "UMAP1", "UMAP2", "age", "sex", "genotype")],
+CC_patterns$projection <- merge(pData(dat.filtered)[,c("cell_id", "UMAP1", "UMAP2", "age", "sex", "genotype")], #merge with metadata from CDS obj
                                 CC_patterns$projection, 
                                 by.x = "cell_id", 
                                 by.y = 0)
+
 melted_CC_patterns_projection <- melt(CC_patterns$projection, 
                                       id = c("cell_id", "UMAP1", "UMAP2", "age", "sex", "genotype"))
+
 melted_CC_patterns_projection$variable <- factor(melted_CC_patterns_projection$variable, levels = c("Pattern_40", "Pattern_41", "Pattern_42"))
+
 melted_CC_patterns_pval <- melt(CC_patterns$pval)
-melted_CC_patterns <- merge(melted_CC_patterns_projection, melted_CC_patterns_pval, by.x = c("cell_id", "variable"), by.y = c("Var1", "Var2"))
+
+melted_CC_patterns <- merge(melted_CC_patterns_projection, melted_CC_patterns_pval, by.x = c("cell_id", "variable"), by.y = c("Var1", "Var2")) #merge projection and pval data
 colnames(melted_CC_patterns) <- c("cell_id", "pattern", "x", "y", "age", "sex", "genotype", "weight", "pval")
 
-phase <- c("Pattern_40" = "S", 
-       "Pattern_41" = "Early M", 
-       "Pattern_42" = "Late M")
 
-
-
-tmp <- merge(linnarsson_dat[,c("X", "Y","parentCellType")], linnarsson_gapsresult@sampleFactors[,40:42], by = 0)
+tmp <- merge(linnarsson_dat[,c("X", "Y","parentCellType")], linnarsson_gapsresult@sampleFactors[,40:42], by = 0) # gather pattern weights and UMAP coords for data the patterns were leared on 
+# parentCellType is included bc neurons and glia are plotted separately (coordinates are from original publication) but patterns were learned on the combined data
 tmp <- melt(tmp, id.vars = c("Row.names", "X", "Y", "parentCellType"))
 names(tmp) <- c("cell_id", "x", "y", "subset", "pattern", "weight")
 tmp$significant <- TRUE
 
-melted_CC_patterns$significant <- melted_CC_patterns$pval < 0.05/nrow(pData(dat.filtered))
-melted_CC_patterns$subset <- "HD"
-tmp2 <- rbind(tmp, melted_CC_patterns[,names(tmp)])
-tmp2$subset <- factor(tmp2$subset, levels = c("glia", "neuron", "HD"))
+melted_CC_patterns$significant <- melted_CC_patterns$pval < 0.05/nrow(pData(dat.filtered)) # return T/F values for significance after bonferroni correction
+melted_CC_patterns$subset <- "HD" # for faceting
+tmp2 <- rbind(tmp, melted_CC_patterns[,names(tmp)]) # combine public data with our data into one object
+tmp2$subset <- factor(tmp2$subset, levels = c("glia", "neuron", "HD")) # for faceting
+
+
+phase <- c("Pattern_40" = "S", #for labeller function in plot
+       "Pattern_41" = "Early M", 
+       "Pattern_42" = "Late M") 
 
 # CC pattern plots
+#40 = S Phase
 
-
-#40 = S
 p1 <- ggplot(tmp2[tmp2$pattern == "Pattern_40",]) +
   geom_point(aes(x=x, y=y, 
      color = weight), size = 0.1) +
@@ -484,7 +487,7 @@ CC_patterns[["projection"]][,"max_value"] <- as.numeric(CC_patterns[["projection
 
 CC_patterns[["projection"]][,"max_pattern"] <- factor(CC_patterns[["projection"]][,"max_pattern"], levels = c("S", "Early M", "Late M"))
 
-p2 <- ggplot(CC_patterns$projection) +
+ggplot(CC_patterns$projection) +
   geom_point(aes(x=UMAP1, y=UMAP2, 
                  color = max_pattern,
                  alpha = max_value), size = 0.7,
@@ -496,8 +499,7 @@ p2 <- ggplot(CC_patterns$projection) +
         plot.title = element_text(face = "plain"),
         axis.title = element_text(size = 12),
         axis.text = element_blank(),
-        axis.ticks = element_blank(),
-        legend.position = "none"
+        axis.ticks = element_blank()
   )
 
 pdf("CC_MPM.pdf", width = 4, height = 4, useDingbats = F)
@@ -505,153 +507,67 @@ p2
 dev.off()
 
 
-p1 <- ggplot(tmp2[tmp2$pattern == "Pattern_40",]) +
-  geom_point(aes(x=x, 
-                 y=y,
-                 alpha = weight),
-             color = "#1B9E77",
-             size = 0.1) +
-  ggtitle("Pattern 40\nS Phase") +
-  facet_wrap(~subset, scales = "free", ncol = 3) +
-#  scale_color_gradient("Pattern weight", low = "#F1F1F1", high = "#1B9E77", guide = FALSE) +
-  scale_alpha(range = c(0,1), guide = F) +
-  scale_x_continuous("Reduced dimension 1") +
-  scale_y_continuous("Reduced dimension 2") +
-  theme(plot.title = element_text(size = 6, face = "plain", hjust = 0.01, margin = margin(b = -12)),
-        strip.background = element_blank(), 
-        strip.text = element_blank(), 
-        axis.title.x = element_blank(),
-        axis.title.y = element_text(size = 6, margin = margin(r = -1)),
-        axis.text.x = element_blank(),
-        axis.text.y = element_text(size = 6, margin = margin(r = -1)),
-        axis.ticks = element_blank()
-        ) 
-
-p2 <- ggplot(tmp2[tmp2$pattern == "Pattern_41",]) +
-  geom_point(aes(x=x, 
-                 y=y,
-                 alpha = weight),
-             color = "#D95F02",
-             size = 0.1) +
-  ggtitle("Pattern 41\nEarly to Mid M Phase") +
-  facet_wrap(~subset, scales = "free", ncol = 3) +
-#  scale_color_viridis("Pattern weight", option = "inferno", guide = FALSE) +
-  scale_alpha(range = c(0,1), guide = F) +
-  scale_x_continuous("Reduced dimension 1") +
-  scale_y_continuous("Reduced dimension 2") +
-  theme(plot.title = element_text(size = 6, face = "plain", hjust = 0.01, margin = margin(b = -12)),
-        strip.background = element_blank(), 
-        strip.text = element_blank(), 
-        axis.title.x = element_blank(),
-        axis.title.y = element_text(size = 6, margin = margin(r = -1)),
-        axis.text.x = element_blank(),
-        axis.text.y = element_text(size = 6, margin = margin(r = -1)),
-        axis.ticks = element_blank()
-        ) 
-
-p3 <- ggplot(tmp2[tmp2$pattern == "Pattern_42",]) +
-  geom_point(aes(x=x, 
-                 y=y,
-                 alpha = weight),
-             color = "#7570B3",
-             size = 0.1) +
-  ggtitle("Pattern 42\nLate M Phase") +
-  facet_wrap(~subset, scales = "free", ncol = 3) +
-  #scale_color_viridis("Pattern\nweight", option = "inferno", breaks = c(0, 1)) +
-  scale_alpha(range = c(0,1), guide = F) +
-  scale_x_continuous("Reduced dimension 1") +
-  scale_y_continuous("Reduced dimension 2") +
-  theme(plot.title = element_text(size = 6, face = "plain", hjust = 0.01, margin = margin(b = -12)),
-        strip.background = element_blank(), 
-        strip.text = element_blank(), 
-        axis.title = element_text(size = 6),
-        axis.title.x = element_text(margin = margin(t = -1)),
-        axis.title.y = element_text(margin = margin(r = -1)),
-        axis.text = element_text(size = 6),
-        axis.text.x = element_text(margin = margin(t = -1)),
-        axis.text.y = element_text(margin = margin(r = -1)),
-        axis.ticks = element_blank(),
-        legend.position = c(0.93, 0.28),
-        legend.background = element_blank(),
-        legend.key.height = unit(7, "pt"),
-        legend.key.width = unit(5, "pt"),
-        legend.text = element_text(size = 4),
-        legend.title = element_text(size = 6)
-        ) 
-
-pdf("CC_pattern_projections_v2.pdf", width = 6, height = 5.5, useDingbats = F)
-grid.arrange(p1, p2, p3, ncol = 1)
-dev.off()
 
 p1 <- ggplot(tmp2[tmp2$pattern == "Pattern_40" & tmp2$subset == "HD",]) +
   geom_point(aes(x=x, 
                  y=y,
-                 alpha = weight),
-             color = "#1B9E77",
+                 color = weight),
              size = 0.1) +
   ggtitle("Pattern 40\nS Phase") +
-  scale_alpha(range = c(0,1), guide = F) +
-  scale_x_continuous("Reduced dimension 1") +
-  scale_y_continuous("Reduced dimension 2") +
+  scale_color_viridis(option ="inferno", breaks = c(0,1)) +
+  scale_x_continuous("UMAP1") +
+  scale_y_continuous("UMAP2") +
   theme(aspect.ratio = 1,
-        plot.title = element_text(size = 6, face = "plain", hjust = 0.01, margin = margin(b = -12)),
-        axis.title = element_text(size = 6),
+        plot.title = element_text(size = 8, face = "plain", hjust = 0.01, margin = margin(b = -16)),
+        axis.title = element_text(size = 8),
         axis.title.x = element_text(margin = margin(t = -1)),
         axis.title.y = element_text(margin = margin(r = -1)),
-        axis.text = element_text(size = 6),
-        axis.text.x = element_text(margin = margin(t = -1)),
-        axis.text.y = element_text(margin = margin(r = -1)),
-        axis.ticks = element_blank()
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        legend.position = c(0.7, 0.25),
+        legend.background = element_blank(),
+        legend.key.height = unit(7, "pt"),
+        legend.key.width = unit(7, "pt"),
+        legend.text = element_text(size = 8),
+        legend.title = element_text(size = 8)
         ) 
 
 p2 <- ggplot(tmp2[tmp2$pattern == "Pattern_41" & tmp2$subset == "HD",]) +
   geom_point(aes(x=x, 
                  y=y,
-                 alpha = weight),
-             color = "#D95F02",
+                 color = weight),
              size = 0.1) +
   ggtitle("Pattern 41\nEarly to Mid M Phase") +
-  scale_alpha(range = c(0,1), guide = F) +
-  scale_x_continuous("Reduced dimension 1") +
-  scale_y_continuous("Reduced dimension 2") +
+  scale_color_viridis(option ="inferno", guide = F) +
+  scale_x_continuous("UMAP1") +
+  scale_y_continuous("UMAP2") +
   theme(aspect.ratio = 1,
-        plot.title = element_text(size = 6, face = "plain", hjust = 0.01, margin = margin(b = -12)),
-        axis.title = element_text(size = 6),
+        plot.title = element_text(size = 8, face = "plain", hjust = 0.01, margin = margin(b = -16)),
+        axis.title = element_text(size = 8),
         axis.title.x = element_text(margin = margin(t = -1)),
         axis.title.y = element_text(margin = margin(r = -1)),
-        axis.text = element_text(size = 6),
-        axis.text.x = element_text(margin = margin(t = -1)),
-        axis.text.y = element_text(margin = margin(r = -1)),
+        axis.text = element_blank(),
         axis.ticks = element_blank()
         ) 
 
 p3 <- ggplot(tmp2[tmp2$pattern == "Pattern_42" & tmp2$subset == "HD",]) +
   geom_point(aes(x=x, 
                  y=y,
-                 alpha = weight),
-             color = "#7570B3",
+                 color = weight),
              size = 0.1) +
   ggtitle("Pattern 42\nLate M Phase") +
-  scale_alpha(range = c(0,1), guide = F) +
-  scale_x_continuous("Reduced dimension 1") +
-  scale_y_continuous("Reduced dimension 2") +
+  scale_color_viridis(option ="inferno", guide = F) +
+  scale_x_continuous("UMAP1") +
+  scale_y_continuous("UMAP2") +
   theme(aspect.ratio = 1,
-        plot.title = element_text(size = 6, face = "plain", hjust = 0.01, margin = margin(b = -12)),
+        plot.title = element_text(size = 8, face = "plain", hjust = 0.01, margin = margin(b = -16)),
         strip.background = element_blank(), 
         strip.text = element_blank(), 
-        axis.title = element_text(size = 6),
+        axis.title = element_text(size = 8),
         axis.title.x = element_text(margin = margin(t = -1)),
         axis.title.y = element_text(margin = margin(r = -1)),
-        axis.text = element_text(size = 6),
-        axis.text.x = element_text(margin = margin(t = -1)),
-        axis.text.y = element_text(margin = margin(r = -1)),
-        axis.ticks = element_blank(),
-        legend.position = c(0.93, 0.28),
-        legend.background = element_blank(),
-        legend.key.height = unit(7, "pt"),
-        legend.key.width = unit(5, "pt"),
-        legend.text = element_text(size = 4),
-        legend.title = element_text(size = 6)
+        axis.text = element_blank(),
+        axis.ticks = element_blank()
         ) 
 
 pdf("CC_pattern_projections_v2_horizontal.pdf", width = 7, height = 2.5, useDingbats = F)
@@ -719,34 +635,38 @@ pdf("CC_pattern_ecdf.pdf", width = 8, height = 3, useDingbats = F)
 grid.arrange(p1, p2, p3, nrow = 1)
 dev.off()
 
-
+#subset projection weights by condition (age*genotype)
 a <- CC_patterns$projection[CC_patterns$projection$age == "E12.5" & CC_patterns$projection$genotype == "het", paste0("Pattern_", 40:42)]
 b <- CC_patterns$projection[CC_patterns$projection$age == "E12.5" & CC_patterns$projection$genotype == "hom", paste0("Pattern_", 40:42)]
 c <- CC_patterns$projection[CC_patterns$projection$age == "E14.5" & CC_patterns$projection$genotype == "het", paste0("Pattern_", 40:42)]
 d <- CC_patterns$projection[CC_patterns$projection$age == "E14.5" & CC_patterns$projection$genotype == "hom", paste0("Pattern_", 40:42)]
 
-# ** p < 0.05/6
-# *** p < 0.01/6
-ks.test(a$Pattern_40, b$Pattern_40) # p = 0.1931
-ks.test(a$Pattern_40, c$Pattern_40) # p < 2.2e-16 **
-ks.test(a$Pattern_40, d$Pattern_40) # p < 2.2e-16 **
-ks.test(b$Pattern_40, c$Pattern_40) # p < 2.2e-16 **
-ks.test(b$Pattern_40, d$Pattern_40) # p = 3.331e-16 **
-ks.test(c$Pattern_40, d$Pattern_40) # p = 1.609e-5 **
+# 6 pairwise tests for each pattern
+# * p < 0.05/6
+# ** p < 0.01/6
 
-ks.test(a$Pattern_41, b$Pattern_41) # p = 0.02552 
-ks.test(a$Pattern_41, c$Pattern_41) # p < 2.2e-16 **
-ks.test(a$Pattern_41, d$Pattern_41) # p < 2.2e-16 **
-ks.test(b$Pattern_41, c$Pattern_41) # p < 2.2e-16 **
-ks.test(b$Pattern_41, d$Pattern_41) # p = 6.395e-14 **
-ks.test(c$Pattern_41, d$Pattern_41) # p = 3.279e-5 **
+ks.test(a$Pattern_40, b$Pattern_40) # p = 0.1931, E12.5 het vs E12.5 hom (genotype)
+ks.test(a$Pattern_40, c$Pattern_40) # p < 2.2e-16 **, E12.5 het vs. E14.5 het (age)
+ks.test(a$Pattern_40, d$Pattern_40) # p < 2.2e-16 **, E12.5 het vs E14.5 hom (age*genotype)
+ks.test(b$Pattern_40, c$Pattern_40) # p < 2.2e-16 **, E12.5 hom vs. E14.5 het (age*genotype)
+ks.test(b$Pattern_40, d$Pattern_40) # p = 3.331e-16 **, E12.5 hom vs. E14.5 hom (age)
+ks.test(c$Pattern_40, d$Pattern_40) # p = 1.609e-5 **, E14.5 het vs. E14.5 hom (genotype)
 
-ks.test(a$Pattern_42, b$Pattern_42) # p = 0.3977
-ks.test(a$Pattern_42, c$Pattern_42) # p < 2.308e-9 **
-ks.test(a$Pattern_42, d$Pattern_42) # p < 2.976e-9 **
-ks.test(b$Pattern_42, c$Pattern_42) # p < 1.591e-11 **
-ks.test(b$Pattern_42, d$Pattern_42) # p = 3.234e-10 **
-ks.test(c$Pattern_42, d$Pattern_42) # p = 0.003222 *
+ks.test(a$Pattern_41, b$Pattern_41) # p = 0.02552 (E12.5 genotype)
+ks.test(a$Pattern_41, c$Pattern_41) # p < 2.2e-16 ** (het age)
+ks.test(a$Pattern_41, d$Pattern_41) # p < 2.2e-16 ** (age*genotype)
+ks.test(b$Pattern_41, c$Pattern_41) # p < 2.2e-16 ** (age*genotype)
+ks.test(b$Pattern_41, d$Pattern_41) # p = 6.395e-14 ** (hom age)
+ks.test(c$Pattern_41, d$Pattern_41) # p = 3.279e-5 ** (E14.5 genotype)
+
+ks.test(a$Pattern_42, b$Pattern_42) # p = 0.3977 (E12.5 genotype)
+ks.test(a$Pattern_42, c$Pattern_42) # p < 2.308e-9 ** (het age)
+ks.test(a$Pattern_42, d$Pattern_42) # p < 2.976e-9 ** (age*genotype)
+ks.test(b$Pattern_42, c$Pattern_42) # p < 1.591e-11 ** (age*genotype)
+ks.test(b$Pattern_42, d$Pattern_42) # p = 3.234e-10 ** (hom age)
+ks.test(c$Pattern_42, d$Pattern_42) # p = 0.003222 * (E14.5 genotype)
+
+
 
 melted_CC_patterns %>%
   mutate(condition = paste(age, genotype)) %>%
@@ -978,7 +898,7 @@ nmat <- ldat$unspliced # intronic read (unspliced) expression matrix
 smat <- ldat$spanning # spanning read (intron+exon) expression matrix
 
 fit.quantile <- 0.05
-rvel.qf <- gene.relative.velocity.estimates(emat, nmat, deltaT = 1, kCells = 5, fit.quantile = fit.quantile) # perhaps the most robust estimate, that combines cell kNN pooling with the gamma fit based on an extreme quantiles
+rvel.qf <- gene.relative.velocity.estimates(emat, nmat, deltaT = 1, kCells = 15, fit.quantile = fit.quantile) # perhaps the most robust estimate, that combines cell kNN pooling with the gamma fit based on extreme quantiles
 pca.velocity.plot(rvel.qf, nPcs = 5, plot.cols = 2, cell.colors = ac(cell.colors, alpha = 0.7), cex = 1.2, pcount = 0.1, pc.multipliers = c(1,-1,-1,-1,-1)) # visualize the velocities by projecting observed and extrapolated cells onto the first 5 PCs
 
 
@@ -989,16 +909,22 @@ pca.velocity.plot(rvel,nPcs=5,plot.cols=2,cell.colors=ac(cell.colors,alpha=0.7),
 
 #####
 
-cell.alpha=1
+#cell.colors <- ifelse(pData(dat.filtered)$genotype == "het", "#E41A1C", "#377EB8")
+cell.colors <- ifelse(pData(dat.filtered)$celltype == "neuron", cbPalette[1], cbPalette[2])
+names(cell.colors) <- pData(dat.filtered)$cell_id
+cell.alpha=0.8
 cell.cex=1
 
 vel <- rvel.qf #knn pooling
 
+source("custom_show.velocity.on.embedding.cor.R")
 p <- custom_show.velocity.on.embedding.cor(as.matrix(emb), vel, n = 50, scale = 'sqrt', cell.colors = ac(cell.colors, alpha = cell.alpha), cex = cell.cex, arrow.scale = 20, arrow.lwd = 1, return.details = T)
 
-show.velocity.on.embedding.cor(as.matrix(emb), vel, n = 50, scale = 'sqrt', cell.colors = ac(cell.colors, alpha = cell.alpha), cex = cell.cex, arrow.scale = 30, show.grid.flow = TRUE, min.grid.cell.mass = 0.5, grid.n = 30, arrow.lwd = 2, cell.border.alpha = 0)
+p <- custom_show.velocity.on.embedding.cor(as.matrix(emb), vel, n = 50, scale = 'sqrt', cell.colors = ac(cell.colors, alpha = cell.alpha), cex = cell.cex, arrow.scale = 30, show.grid.flow = TRUE, min.grid.cell.mass = 0.5, grid.n = 24, arrow.lwd = 2, cell.border.alpha = 0)
 
-velocities <- merge(p$velocity, pData(dat.filtered)[, c("age", "sex", "genotype", "cluster", "final_celltype", "CC_phase")], by = 0)
+saveRDS(p, "velocity_estimates.rds")
+
+velocities <- merge(p$velocity, pData(dat.filtered)[, c("age", "sex", "genotype", "cluster", "celltype")], by = 0)
 
 #########################
 # Cluster
@@ -1018,11 +944,16 @@ ggplot(cluster_velocities) +
   geom_segment(aes(x = 0, y = 0, xend = mean_Vx, yend = mean_Vy, color = cluster), lineend = "round", linejoin = "mitre", arrow = arrow(length = unit(0.02, "npc"))) +
   scale_color_brewer(palette = "Set1", guide = guide_legend(ncol = 2)) +
   scale_fill_brewer(palette = "Set1", guide = guide_legend(ncol = 2)) +
-  scale_y_continuous(limits = c(-0.03, 0.03), breaks = seq(-0.03, 0.03, 0.01), expand = c(0,0)) +
-  scale_x_continuous(limits = c(-0.09, 0.04), breaks = seq(-0.09, 0.04, 0.01), expand = c(0,0)) +
+#  scale_y_continuous(limits = c(-0.03, 0.03), breaks = seq(-0.03, 0.03, 0.01), expand = c(0,0)) +
+#  scale_x_continuous(limits = c(-0.09, 0.04), breaks = seq(-0.09, 0.04, 0.01), expand = c(0,0)) +
   coord_fixed() +
   labs(x = "Mean Vx", y = "Mean Vy", color = "Cluster", fill = "Cluster", title = "Mean RNA Velocity by Cluster") +
   theme(legend.position = c(0.1, 0.75), legend.background = element_blank())
+
+ggplot(velocities, aes(x = Vx, y = Vy)) +
+stat_density2d(geom="tile", aes(fill = ..density..), contour = FALSE) +
+  facet_wrap(~cluster + genotype) +
+  scale_fill_viridis()
 
 #########################
 # Cluster:genotype
@@ -1059,11 +990,26 @@ ggplot(cluster_genotype_velocities) +
   scale_color_brewer("Cluster", palette = "Set1", guide = guide_legend(ncol = 2)) +
   scale_fill_brewer("Cluster", palette = "Set1", guide = guide_legend(ncol = 2)) +
   scale_linetype("Genotype") +
-  scale_x_continuous("Mean Vx", limits = c(-0.09, 0.05), breaks = seq(-0.08, 0.04, 0.04), expand = c(0,0)) +
-  scale_y_continuous("Mean Vy", limits = c(-0.09, 0.05), breaks = seq(-0.08, 0.04, 0.04), expand = c(0,0)) +
+  #scale_x_continuous("Mean Vx", limits = c(-0.09, 0.05), breaks = seq(-0.08, 0.04, 0.04), expand = c(0,0)) +
+  #scale_y_continuous("Mean Vy", limits = c(-0.09, 0.05), breaks = seq(-0.08, 0.04, 0.04), expand = c(0,0)) +
   coord_fixed() +
   ggtitle("Mean RNA Velocity by Cluster:Genotype") +
-  theme(legend.position = c(0.83, 0.15), legend.background = element_blank(), legend.box = "horizontal")
+  theme(legend.position = "none")
+#  theme(legend.position = c(0.83, 0.15), legend.background = element_blank(), legend.box = "horizontal")
+
+ggplot(cluster_genotype_velocities) +
+  theme_gray() +
+  geom_hline(yintercept = 0, color = "gray50") +
+  geom_vline(xintercept = 0, color = "gray50") +
+  ggforce::geom_ellipse(aes(x0 = mean_Vx, y0 = mean_Vy, a = se_Vx, b = se_Vy, angle = 0, color = genotype, fill = genotype), alpha = 0.1) +
+  geom_segment(aes(x = 0, y = 0, xend = mean_Vx, yend = mean_Vy, color = genotype), lineend = "round", linejoin = "mitre", arrow = arrow(length = unit(0.02, "npc"))) +
+  geom_point(aes(x = velocities$Vx, y = velocities$Vy)) +
+  facet_wrap(~cluster) +
+  scale_color_brewer("Genotype", palette = "Set1", guide = guide_legend(ncol = 2)) +
+  scale_fill_brewer("Genotype", palette = "Set1", guide = guide_legend(ncol = 2)) +
+  coord_fixed() +
+  ggtitle("Mean RNA Velocity by Cluster:Genotype") +
+  theme(legend.position = "none")
 
 ggplot(cluster_genotype_velocities) +
   theme_gray() +
@@ -1078,6 +1024,18 @@ ggplot(cluster_genotype_velocities) +
   coord_fixed() +
   labs(x = "Mean Vx", y = "Mean Vy", color = "Cluster", lty = "Genotype", title = "Mean RNA Velocity by Cluster:Genotype") +
   theme(axis.line = element_blank(), legend.position = c(0.8, 0.25), legend.background = element_blank())
+
+
+ggplot(velocities, aes(x = Vx, y = Vy, color = genotype)) +
+  geom_point() +
+  facet_wrap(~cluster) +
+  scale_color_brewer(palette = "Set1") +
+  stat_ellipse()
+
+ggplot(velocities, aes(x = Vx, y = Vy, color = genotype)) +
+  geom_density_2d(aes(group = genotype)) +
+  facet_wrap(~cluster) +
+  scale_color_brewer(palette = "Set1")
 
 #########################
 # Cell type:genotype

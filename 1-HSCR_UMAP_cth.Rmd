@@ -373,6 +373,29 @@ plotUMAP(dat.filtered, color = "celltype") +
   scale_color_manual(values = cbPalette[1:2]) +
   theme(aspect.ratio = 1)
 
+pdf("UMAP_parentcelltype_neuron_glia.pdf", height = 2, width = 2, useDingbats = F)
+plotUMAP(dat.filtered, color = "celltype", size = 0.1) +
+  scale_color_manual("Cell Type", values = cbPalette[c(1:2)]) +
+    theme(aspect.ratio = 1,
+        plot.title = element_text(size = 6, face = "plain", hjust = 0.01, margin = margin(b = -12)),
+        strip.background = element_blank(), 
+        strip.text = element_blank(), 
+        axis.title = element_text(size = 6),
+        axis.title.x = element_text(margin = margin(t = -1)),
+        axis.title.y = element_text(margin = margin(r = -1)),
+        axis.text = element_text(size = 6),
+        axis.text.x = element_text(margin = margin(t = -1)),
+        axis.text.y = element_text(margin = margin(r = -1)),
+        axis.ticks = element_blank(),
+        legend.position = c(0.3, 0.2),
+        legend.background = element_blank(),
+        legend.key.height = unit(10, "pt"),
+        legend.key.width = unit(5, "pt"),
+        legend.text = element_text(size = 6),
+        legend.title = element_text(size = 8)
+        ) 
+dev.off()
+
 #Etv1, Gal, Nos1, Vip = Branch A = inhibitory MNs
 grid.arrange(plotUMAP(dat.filtered, markers = c("Etv1", "Gal", "Nos1", "Vip")),
              plotUMAP(dat.filtered, color = "cluster"),
@@ -403,7 +426,7 @@ plotUMAP(dat.filtered, color = "celltype") +
   scale_color_manual(values = cbPalette[c(1:3, 6)]) +
   theme(aspect.ratio = 1)
 
-pdf("UMAP_celltype.pdf", height = 2, width = 2, useDingbats = F)
+pdf("UMAP_parentcelltype_neuron_glia.pdf", height = 2, width = 2, useDingbats = F)
 plotUMAP(dat.filtered, color = "celltype", size = 0.1) +
   scale_color_manual("Cell Type", values = cbPalette[c(1:3, 6)]) +
     theme(aspect.ratio = 1,
