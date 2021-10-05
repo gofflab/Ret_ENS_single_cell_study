@@ -32,10 +32,10 @@ heatmap_data <- heatmap_data[order.dendrogram(as.dendrogram(hclust(dist(heatmap_
 #heatmap_data[heatmap_data == 0] <- NA
 
 #myLower <- 0
-myUpper <- 1
+#myUpper <- 1
 
 #heatmap_data[heatmap_data < myLower] <- myLower
-heatmap_data[heatmap_data > myUpper] <- myUpper
+#heatmap_data[heatmap_data > myUpper] <- myUpper
 
 heatmap_annotation <- pData(dat.filtered)[, "genotype", drop = F]
 colnames(heatmap_annotation) <- "Genotype"
@@ -66,23 +66,12 @@ pheatmap(mat = heatmap_data,
          )
 dev.off()
 
-genotype_gene_names <- lookupGeneName(dat.filtered, genotype_diff_test_sorted_sig_genes)
-
-het_means <- apply(exprs(dat.filtered)[genotype_diff_test_sorted_sig_genes,pData(dat.filtered)$genotype == "het"], 1,mean)
-hom_means <- apply(exprs(dat.filtered)[genotype_diff_test_sorted_sig_genes,pData(dat.filtered)$genotype == "hom"], 1,mean)
-
-genotype_relative_exprs <- hom_means/het_means
-
-globally_upregulated_in_hom <- names(genotype_relative_exprs[genotype_relative_exprs > 1 | genotype_relative_exprs == "Inf"])
-
-globally_downregulated_in_hom <- names(genotype_relative_exprs[genotype_relative_exprs < 1])
-
 egENSEMBL <- toTable(org.Mm.egENSEMBL)
 
-globally_upregulated_in_hom_entrez <- gsub("\\..*","",globally_upregulated_in_hom)
-m<-match(globally_upregulated_in_hom_entrez,egENSEMBL$ensembl_id)
-globally_upregulated_in_hom_entrez <- egENSEMBL$gene_id[m]
-ego_globally_upregulated <- enrichGO(gene = globally_upregulated_in_hom_entrez,
+genotype_diff_test_entrez <- gsub("\\..*","", genotype_diff_test_sig_genes)
+m <- match(genotype_diff_test_entrez, egENSEMBL$ensembl_id)
+genotype_diff_test_entrez <- egENSEMBL$gene_id[m]
+ego_genotype <- enrichGO(gene = genotype_diff_test_entrez,
                 OrgDb =       'org.Mm.eg.db',
                 ont           = "BP",
                 pAdjustMethod = "BH",
@@ -90,31 +79,11 @@ ego_globally_upregulated <- enrichGO(gene = globally_upregulated_in_hom_entrez,
                 qvalueCutoff  = 0.05, 
                 readable      = TRUE)
 
-globally_downregulated_in_hom_entrez <- gsub("\\..*","",globally_downregulated_in_hom)
-m<-match(globally_downregulated_in_hom_entrez,egENSEMBL$ensembl_id)
-globally_downregulated_in_hom_entrez <- egENSEMBL$gene_id[m]
-ego_globally_downregulated <- enrichGO(gene = globally_downregulated_in_hom_entrez,
-                OrgDb =       'org.Mm.eg.db',
-                ont           = "BP",
-                pAdjustMethod = "BH",
-                pvalueCutoff  = 1,
-                qvalueCutoff  = 0.05, 
-                readable      = TRUE)
+write.csv(ego_genotype@result, "DEG_all_cells_genotype_GO.csv")
 
+ego_genotype_subset <- ego_genotype@result[c(3,4,6,7,8,10,17,22,23, 30, 34, 39, 41, 43, 44, 46, 48, 52, 56, 57, 58, 65, 66, 78, 95, 99, 101, 103, 104, 106, 107, 113, 119, 128, 148, 159, 162, 177, 179, 180, 182, 183, 191, 194, 195, 203, 210, 223, 224, 225, 232, 245, 254, 255, 258, 262, 264, 265, 266, 267, 268, 269, 278, 281, 282, 285, 297, 299, 300, 302, 308, 312, 320, 334, 346, 353, 354, 355, 369, 370, 378, 382, 385, 388, 399, 419, 422, 423, 428, 440, 441, 464, 471, 482, 483, 488, 494, 497, 516, 519, 534, 569, 578, 596, 598, 608, 617, 622, 626, 636, 692, 710, 712, 717, 719, 720, 727, 744, 756, 757, 768, 769, 776, 784, 787, 793, 794),]
 
-hom_glia_genes <- c("Vamp8", "Tspan12", "Lmna", "Dse", "Epb41l3", "Irf6", "Afap1l1", "Plp1", "Fabp7", "Timp3", "Mmp2", "Postn", "Slitrk2", "Pls3", "Gpr17", "Deptor", "Aldh1a3", "Fam198b", "Vgll3", "Cnn2", "Myl9", "Anxa2", "Fkbp10", "Adamts1", "Il1rap", "Cdk6", "Nkd2", "Tram2", "Lims2", "Kctd12", "Klk8", "Pcgf5", "Cyr61", "Col4a1", "F3", "Ctgf", "Hapln1", "Moxd1", "Tm4sf1", "Cryab", "Col3a1", "Afap1l2", "Limch1", "Sox5", "Pros1", "Sorbs2", "Abcg2", "Trnau1ap", "Slc44a2", "B2m")
-
-hom_glia_genes <- lookupGeneId(dat.filtered, hom_glia_genes)
-hom_glia_genes <- gsub("\\..*","", hom_glia_genes)
-m<-match(hom_glia_genes, egENSEMBL$ensembl_id)
-hom_glia_genes_entrez <- egENSEMBL$gene_id[m]
-ego_hom_glia <- enrichGO(gene = hom_glia_genes_entrez,
-                OrgDb =       'org.Mm.eg.db',
-                ont           = "BP",
-                pAdjustMethod = "BH",
-                pvalueCutoff  = 1,
-                qvalueCutoff  = 0.05, 
-                readable      = TRUE)
+ego_genotype_subset <- ego_genotype_subset[!ego_genotype_subset$ID %in% c("GO:0009713", "GO:0042423", "GO:0009712", "GO:0042416", "GO:0007272", "GO:008366", "GO:0007096", "GO:0055057", "GO:0046879", "GO:0014009", "GO:0051961", "GO:0007411", "GO:0050433", "GO:0050432", "GO:0014032", "GO:0042415", "GO:0008344", "GO:0014014", "GO:0014015", "GO:0030852"),]
 ```
 
 ```{r genotype:sex}
@@ -132,16 +101,15 @@ length(genotype_sex_diff_test_sig_genes)
 #heatmap_data <- log(tmp -min(tmp) + 1)
 
 heatmap_data <- log10(exprs(dat.filtered)[genotype_sex_diff_test_sig_genes,] + 1) # log transform
-heatmap_data <- t(apply(heatmap_data, 1, function(x){ # Normalize gene expr by dividing by SD
-  x/sd(x)
-}))
+#heatmap_data <- t(apply(heatmap_data, 1, function(x){ # Normalize gene expr by dividing by SD
+#  x/sd(x)
+#}))
 
+#myLower <- 0
+#myUpper <- 10
 
-myLower <- 0
-myUpper <- 10
-
-heatmap_data[heatmap_data < myLower] <- myLower
-heatmap_data[heatmap_data > myUpper] <- myUpper
+#heatmap_data[heatmap_data < myLower] <- myLower
+#heatmap_data[heatmap_data > myUpper] <- myUpper
 
 rownames(heatmap_data) <- lookupGeneName(dat.filtered, rownames(heatmap_data))
 heatmap_data <- heatmap_data[order.dendrogram(as.dendrogram(hclust(dist(heatmap_data)))),order.dendrogram(as.dendrogram(hclust(dist(t(heatmap_data)))))]
@@ -175,23 +143,12 @@ pheatmap(mat = heatmap_data,
          )
 dev.off()
 
-genotype_sex_gene_names <- lookupGeneName(dat.filtered, genotype_sex_diff_test_sorted_sig_genes)
-
-het_means2 <- apply(exprs(dat.filtered)[genotype_sex_diff_test_sorted_sig_genes,pData(dat.filtered)$genotype == "het"], 1,mean)
-hom_means2 <- apply(exprs(dat.filtered)[genotype_sex_diff_test_sorted_sig_genes,pData(dat.filtered)$genotype == "hom"], 1,mean)
-
-genotype_relative_exprs2 <- hom_means2/het_means2
-
-globally_upregulated_in_hom2 <- names(genotype_relative_exprs2[genotype_relative_exprs2 > 1 | genotype_relative_exprs2 == "Inf"])
-
-globally_downregulated_in_hom2 <- names(genotype_relative_exprs2[genotype_relative_exprs2 < 1])
-
 egENSEMBL <- toTable(org.Mm.egENSEMBL)
 
-globally_upregulated_in_hom_entrez2 <- gsub("\\..*","",globally_upregulated_in_hom2)
-m<-match(globally_upregulated_in_hom_entrez2,egENSEMBL$ensembl_id)
-globally_upregulated_in_hom_entrez2 <- egENSEMBL$gene_id[m]
-ego_globally_upregulated2 <- enrichGO(gene = globally_upregulated_in_hom_entrez2,
+genotype_sex_diff_test_entrez <- gsub("\\..*","", genotype_sex_diff_test_sig_genes)
+m <- match(genotype_sex_diff_test_entrez, egENSEMBL$ensembl_id)
+genotype_sex_diff_test_entrez <- egENSEMBL$gene_id[m]
+ego_genotype_sex <- enrichGO(gene = genotype_sex_diff_test_entrez,
                 OrgDb =       'org.Mm.eg.db',
                 ont           = "BP",
                 pAdjustMethod = "BH",
@@ -199,16 +156,7 @@ ego_globally_upregulated2 <- enrichGO(gene = globally_upregulated_in_hom_entrez2
                 qvalueCutoff  = 0.05, 
                 readable      = TRUE)
 
-globally_downregulated_in_hom_entrez2 <- gsub("\\..*","",globally_downregulated_in_hom2)
-m<-match(globally_downregulated_in_hom_entrez2,egENSEMBL$ensembl_id)
-globally_downregulated_in_hom_entrez2 <- egENSEMBL$gene_id[m]
-ego_globally_downregulated2 <- enrichGO(gene = globally_downregulated_in_hom_entrez2,
-                OrgDb =       'org.Mm.eg.db',
-                ont           = "BP",
-                pAdjustMethod = "BH",
-                pvalueCutoff  = 1,
-                qvalueCutoff  = 0.05, 
-                readable      = TRUE)
+write.csv(ego_genotype_sex@result, "DEG_all_cells_genotypeXsex_GO.csv")
 ```
 
 ```{r genotype:celltype}
@@ -229,11 +177,11 @@ heatmap_data <- t(apply(heatmap_data, 1, function(x){ # Normalize gene expr by d
 #tmp <- t(scale(t(exprs(dat.filtered[genotypeCellType_diff_test_sorted_sig_genes,])),scale = T,center = T))
 #heatmap_data <- log(tmp -min(tmp) + 1)
 
-myLower <- 0
-myUpper <- 6
+#myLower <- 0
+#myUpper <- 6
 
-heatmap_data[heatmap_data < myLower] <- myLower
-heatmap_data[heatmap_data > myUpper] <- myUpper
+#heatmap_data[heatmap_data < myLower] <- myLower
+#heatmap_data[heatmap_data > myUpper] <- myUpper
 
 rownames(heatmap_data) <- lookupGeneName(dat.filtered,rownames(heatmap_data))
 heatmap_data <- heatmap_data[order.dendrogram(as.dendrogram(hclust(dist(heatmap_data)))),order.dendrogram(as.dendrogram(hclust(dist(t(heatmap_data)))))]
@@ -241,7 +189,7 @@ heatmap_data <- heatmap_data[order.dendrogram(as.dendrogram(hclust(dist(heatmap_
 heatmap_annotation <- pData(dat.filtered)[,c("celltype","genotype")]
 
 heatmap_colors <- list(
-"Cell Type" =  c("Acetylcholinergic Neuron" = "#E41A1C", "Neuron" = "#377EB8", "Noradrenergic Neuron" = "#4DAF4A", "Progenitor/Glia" = "#984EA3", "Transition Cell" = "#FF7F00"),
+"Cell Type" =  c("neuron" = "#377EB8", "progenitor/glia" = "#984EA3"),
 "Genotype" = c("het" = "black", "hom" = "gray70"),
 "Age" = c("E12.5" = "#7FC97F", "E14.5" = "#BEAED4"))
 
@@ -265,6 +213,19 @@ pheatmap(mat = heatmap_data,
          treeheight_row = 0
          )
 dev.off()
+
+genotypeCellType_diff_test_entrez <- gsub("\\..*","", genotypeCellType_diff_test_sig_genes)
+m <- match(genotypeCellType_diff_test_entrez, egENSEMBL$ensembl_id)
+genotypeCellType_diff_test_entrez <- egENSEMBL$gene_id[m]
+ego_genotype_celltype <- enrichGO(gene = genotypeCellType_diff_test_entrez,
+                OrgDb =       'org.Mm.eg.db',
+                ont           = "BP",
+                pAdjustMethod = "BH",
+                pvalueCutoff  = 1,
+                qvalueCutoff  = 0.05, 
+                readable      = TRUE)
+
+write.csv(ego_genotype_celltype@result, "DEG_all_cells_genotypeXcelltype_GO.csv")
 ```
 
 ```{r neuron_bifurcation_diff_test}
@@ -277,53 +238,6 @@ write.csv(neuron_bifuracation_difftest_sorted[neuron_bifuracation_difftest_sorte
 neuron_bifuracation_difftest_sig_genes <- rownames(neuron_bifuracation_difftest_sorted[neuron_bifuracation_difftest_sorted$qval < 0.05,])
 
 bifurcation_gene_names <- lookupGeneName(dat.filtered, neuron_bifuracation_difftest_sig_genes)
-
-# het-only = 7, mixed pop = 8
-
-pop7_means <- apply(exprs(dat.filtered)[neuron_bifuracation_difftest_sig_genes, pData(dat.filtered)$cluster == 7], 1,mean)
-pop8_means <- apply(exprs(dat.filtered)[neuron_bifuracation_difftest_sig_genes, pData(dat.filtered)$cluster == 8], 1,mean)
-
-relative_exprs <- pop7_means/pop8_means
-
-upregulated_in_het <- names(relative_exprs[relative_exprs > 1])
-
-downregulated_in_het <- names(relative_exprs[relative_exprs < 1])
-
-egENSEMBL <- toTable(org.Mm.egENSEMBL)
-
-bifurcation_entrez <- gsub("\\..*","",neuron_bifuracation_difftest_sig_genes)
-m<-match(bifurcation_entrez,egENSEMBL$ensembl_id)
-bifurcation_entrez <- egENSEMBL$gene_id[m]
-ego_bifurcation <- enrichGO(gene = bifurcation_entrez,
-                OrgDb =       'org.Mm.eg.db',
-                ont           = "BP",
-                pAdjustMethod = "BH",
-                pvalueCutoff  = 1,
-                qvalueCutoff  = 0.05, 
-                readable      = TRUE)
-
-upregulated_in_het_entrez <- gsub("\\..*","",upregulated_in_het)
-m<-match(upregulated_in_het_entrez,egENSEMBL$ensembl_id)
-upregulated_in_het_entrez <- egENSEMBL$gene_id[m]
-ego_upregulated <- enrichGO(gene = upregulated_in_het_entrez,
-                OrgDb =       'org.Mm.eg.db',
-                ont           = "BP",
-                pAdjustMethod = "BH",
-                pvalueCutoff  = 1,
-                qvalueCutoff  = 0.05, 
-                readable      = TRUE)
-
-downregulated_in_het_entrez <- gsub("\\..*","",downregulated_in_het)
-m<-match(downregulated_in_het_entrez,egENSEMBL$ensembl_id)
-downregulated_in_het_entrez <- egENSEMBL$gene_id[m]
-ego_downregulated <- enrichGO(gene = downregulated_in_het_entrez,
-                OrgDb =       'org.Mm.eg.db',
-                ont           = "BP",
-                pAdjustMethod = "BH",
-                pvalueCutoff  = 1,
-                qvalueCutoff  = 0.05, 
-                readable      = TRUE)
-
 
 #tmp <- t(scale(t(exprs(dat.filtered[neuron_bifuracation_difftest_sorted_sig_genes, pData(dat.filtered)$cluster %in% 7:8])), scale = T, center = T))
 #heatmap_data <- log10(tmp - min(tmp) + 1)
@@ -374,6 +288,20 @@ pheatmap(mat = heatmap_data,
          )
 dev.off()
 
+egENSEMBL <- toTable(org.Mm.egENSEMBL)
+
+bifurcation_entrez <- gsub("\\..*","",neuron_bifuracation_difftest_sig_genes)
+m<-match(bifurcation_entrez,egENSEMBL$ensembl_id)
+bifurcation_entrez <- egENSEMBL$gene_id[m]
+ego_bifurcation <- enrichGO(gene = bifurcation_entrez,
+                OrgDb =       'org.Mm.eg.db',
+                ont           = "BP",
+                pAdjustMethod = "BH",
+                pvalueCutoff  = 1,
+                qvalueCutoff  = 0.05, 
+                readable      = TRUE)
+
+write.csv(ego_bifurcation@result, "DEG_clusters7&8_cluster_GO.csv")
 ```
 
 ```{r Ret_independent_genotype_diff}
@@ -457,6 +385,8 @@ ego_Ret_independent <- enrichGO(gene = Ret_independent_entrez,
                 pvalueCutoff  = 1,
                 qvalueCutoff  = 0.05, 
                 readable      = TRUE)
+
+write.csv(ego_Ret_independent@result, "DEG_cluster8_genotype_GO.csv")
 ```
 
 ```{r genotype_glia}
@@ -466,8 +396,22 @@ glia_genotype_diff_test_sorted <- glia_genotype_diff_test[order(glia_genotype_di
 
 write.csv(glia_genotype_diff_test_sorted[glia_genotype_diff_test_sorted$qval < 0.05, c("gene_short_name", "gene_id", "pval", "qval")], file = "DEG_glia!cluster9_genotype.csv", quote = F, row.names = F)
 
-genotype_diff_test_sig_genes <- rownames(genotype_diff_test_sorted[genotype_diff_test_sorted$qval < 0.05,])
+glia_genotype_diff_test_sig_genes <- rownames(glia_genotype_diff_test_sorted[glia_genotype_diff_test_sorted$qval < 0.05,])
 
+egENSEMBL <- toTable(org.Mm.egENSEMBL)
+
+glia_genotype_entrez <- gsub("\\..*","",glia_genotype_diff_test_sig_genes)
+m<-match(glia_genotype_entrez,egENSEMBL$ensembl_id)
+glia_genotype_entrez <- egENSEMBL$gene_id[m]
+ego_glia_genotype <- enrichGO(gene = glia_genotype_entrez,
+                OrgDb =       'org.Mm.eg.db',
+                ont           = "BP",
+                pAdjustMethod = "BH",
+                pvalueCutoff  = 1,
+                qvalueCutoff  = 0.05, 
+                readable      = TRUE)
+
+write.csv(ego_glia_genotype@result, "DEG_glia!cluster9_genotype_GO.csv")
 ```
 
 

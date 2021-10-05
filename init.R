@@ -83,21 +83,15 @@ plotUMAP <- function(cds, markers = NULL, color_by = NULL, shape = NULL, logMode
 ##################
 #Helper Utils
 ####################
-lookupGeneId<-function(eset,gene_names, unique = T){
+lookupGeneId<-function(eset,gene_names){
   res <- rownames(fData(eset))[match(gene_names, fData(eset)$gene_short_name)]
-  if(unique){
-  res <- unique(res)
-  }
   res
 }
 
-lookupGeneName<-function(eset, gene_id, unique = T){
+lookupGeneName<-function(eset, gene_id){
   gene_id <- gsub("\\..*", "", gene_id)
   rownames(fData(eset)) <- gsub("\\..*", "", rownames(fData(eset)))
   res <- fData(eset)[gene_id, "gene_short_name"]
-  if(unique){
-    res <- unique(res)
-  }
   res
 }
 
