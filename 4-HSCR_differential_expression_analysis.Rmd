@@ -12,24 +12,18 @@ source("init.R")
 # Differential gene expression testing
 ## y ~ genotype
 ```{r genotype}
-genotype_diff_test <- differentialGeneTest(dat.filtered[expressed_genes,], fullModelFormulaStr = "~genotype + sex + batch + total_mRNAs", reducedModelFormulaStr = "~sex + batch + total_mRNAs", verbose = T)
+genotype_diff_test <- differentialGeneTest(dat.filtered[expressed_genes,], fullModelFormulaStr = "~genotype + batch + total_mRNAs", reducedModelFormulaStr = "~batch + total_mRNAs", verbose = T)
 
 genotype_diff_test_sorted <- genotype_diff_test[order(genotype_diff_test$qval),]
 
+write.csv(genotype_diff_test_sorted[genotype_diff_test_sorted$qval < 0.05, c("gene_short_name", "gene_id", "pval", "qval")], file = "DEG_all_cells_genotype.csv", quote = F, row.names = F)
+
 genotype_diff_test_sig_genes <- rownames(genotype_diff_test_sorted[genotype_diff_test_sorted$qval < 0.05,])
 
-#tmp <- t(scale(t(exprs(dat.filtered[genotype_diff_test_sig_genes,])), scale = T, center = T))
-
-#heatmap_data <- log10(exprs(dat.filtered)[genotype_diff_test_sig_genes,] + 1) # log transform
-#heatmap_data <- t(apply(heatmap_data, 1, function(x){ # Normalize gene expr by dividing by SD
-#  x/sd(x)
-#}))
-
-heatmap_data <- exprs(dat.filtered)[genotype_diff_test_sig_genes,]
-heatmap_data <- t(apply(heatmap_data, 1, function(x){ # Normalize gene expr by dividing by SD
-  x/sd(x)
+heatmap_data <- log10(exprs(dat.filtered)[genotype_diff_test_sig_genes,] + 1) # log transform
+heatmap_data <- t(apply(heatmap_data, 1, function(x){ # Normalize gene expr by dividing by max
+  x/max(x)
 }))
-heatmap_data <- log10(heatmap_data + 1) # log transform
 
 rownames(heatmap_data) <- lookupGeneName(dat.filtered, rownames(heatmap_data))
 
@@ -43,35 +37,32 @@ myUpper <- 1
 #heatmap_data[heatmap_data < myLower] <- myLower
 heatmap_data[heatmap_data > myUpper] <- myUpper
 
-heatmap_annotation <- pData(dat.filtered)[, c("parentCelltype", "genotype")]
-colnames(heatmap_annotation) <- c("Cell Type", "Genotype")
+heatmap_annotation <- pData(dat.filtered)[, "genotype", drop = F]
+colnames(heatmap_annotation) <- "Genotype"
 
 heatmap_colors <- list(
-  "Cell Type" =  c("neuron" = "#56B4E9",
-                   "progenitor/glia" = "#E69F00"),
   "Genotype" = c("het" = "#E41A1C", "hom" = "#377EB8"))
 
-pdf("heatmap_DEG_genotype_2.pdf", height = 20, width = 20)
+pdf("DEG_all_cells_genotype_heatmap.pdf", height = 20, width = 20)
 pheatmap(mat = heatmap_data,
          scale="none",
          show_rownames = TRUE,
          show_colnames = FALSE,
          drop_levels = FALSE,
-         cluster_rows = T,
-         cluster_cols = T,
+         cluster_rows = F,
+         cluster_cols = F,
          color = viridis(100),
-         breaks=seq(0, myUpper, length = 100),
+         #breaks=seq(0, myUpper, length = 100),
          #breaks = seq(0, 2.8, length = 200),
          annotation_col = heatmap_annotation,
          annotation_colors = heatmap_colors,
          annotation_names_col = TRUE,
          annotation_legend = TRUE,
-         fontsize_row = 5,
-         treeheight_col = 0,
-         treeheight_row = 0,
-         cutree_rows = 18,
-         cutree_cols = 9
-#         main = "All Cells\n254 Genes, 1% FDR\nFull model: ~ genotype + batch + sex + cell type\nReduced model: ~ batch + sex + cell type"
+         fontsize_row = 5
+#         treeheight_col = 0,
+#         treeheight_row = 0
+         #cutree_rows = 18,
+         #cutree_cols = 9
          )
 dev.off()
 
@@ -130,6 +121,8 @@ ego_hom_glia <- enrichGO(gene = hom_glia_genes_entrez,
 genotype_sex_diff_test <- differentialGeneTest(dat.filtered[expressed_genes,], fullModelFormulaStr = "~genotype*sex + batch + total_mRNAs", reducedModelFormulaStr = "~genotype + sex + batch + total_mRNAs", verbose = T)
 
 genotype_sex_diff_test_sorted <- genotype_sex_diff_test[order(genotype_sex_diff_test$qval),]
+
+write.csv(genotype_sex_diff_test_sorted[genotype_sex_diff_test_sorted$qval < 0.05, c("gene_short_name", "gene_id", "pval", "qval")], file = "DEG_all_cells_genotypeXsex.csv", quote = F, row.names = F)
 
 genotype_sex_diff_test_sig_genes <- rownames(genotype_sex_diff_test_sorted[genotype_sex_diff_test_sorted$qval < 0.05,])
 
@@ -219,9 +212,11 @@ ego_globally_downregulated2 <- enrichGO(gene = globally_downregulated_in_hom_ent
 ```
 
 ```{r genotype:celltype}
-genotypeCellType_diff_test <- differentialGeneTest(dat.filtered[expressed_genes,], fullModelFormulaStr = "~genotype*celltype + sex + batch + total_mRNAs", reducedModelFormulaStr = "~genotype + celltype + sex + batch + total_mRNAs", cores = 1, verbose = T)
+genotypeCellType_diff_test <- differentialGeneTest(dat.filtered[expressed_genes,], fullModelFormulaStr = "~genotype*celltype + batch + total_mRNAs", reducedModelFormulaStr = "~genotype + celltype + batch + total_mRNAs", cores = 1, verbose = T)
 
 genotypeCellType_diff_test_sorted <- genotypeCellType_diff_test[order(genotypeCellType_diff_test$qval),]
+
+write.csv(genotypeCellType_diff_test_sorted[genotypeCellType_diff_test_sorted$qval < 0.05, c("gene_short_name", "gene_id", "pval", "qval")], file = "DEG_all_cells_genotypeXcelltype.csv", quote = F, row.names = F)
 
 genotypeCellType_diff_test_sig_genes<-rownames(genotypeCellType_diff_test_sorted[genotypeCellType_diff_test_sorted$qval < 0.05,])
 
@@ -276,6 +271,8 @@ dev.off()
 neuron_bifuracation_difftest <- differentialGeneTest(dat.filtered[expressed_genes,pData(dat.filtered)$cluster %in% 7:8], fullModelFormulaStr = "~cluster + batch + total_mRNAs", reducedModelFormulaStr = "~batch + total_mRNAs", cores = 1, verbose = T)
 
 neuron_bifuracation_difftest_sorted <- neuron_bifuracation_difftest[order(neuron_bifuracation_difftest$qval),]
+
+write.csv(neuron_bifuracation_difftest_sorted[neuron_bifuracation_difftest_sorted$qval < 0.05, c("gene_short_name", "gene_id", "pval", "qval")], file = "DEG_clusters7&8_cluster.csv", quote = F, row.names = F)
 
 neuron_bifuracation_difftest_sig_genes <- rownames(neuron_bifuracation_difftest_sorted[neuron_bifuracation_difftest_sorted$qval < 0.05,])
 
@@ -384,6 +381,8 @@ Ret_independent_difftest <- differentialGeneTest(dat.filtered[expressed_genes,pD
 
 Ret_independent_difftest_sorted <- Ret_independent_difftest[order(Ret_independent_difftest$qval),]
 
+write.csv(Ret_independent_difftest_sorted[Ret_independent_difftest_sorted$qval < 0.05, c("gene_short_name", "gene_id", "pval", "qval")], file = "DEG_cluster8_genotype.csv", quote = F, row.names = F)
+
 Ret_independent_difftest_sig_genes <- rownames(Ret_independent_difftest_sorted[Ret_independent_difftest_sorted$qval < 0.05,])
 
 het_mean <- apply(exprs(dat.filtered[Ret_independent_difftest_sig_genes, pData(dat.filtered)$cluster == 8 & pData(dat.filtered)$genotype == "het"]), 1, mean)
@@ -458,8 +457,19 @@ ego_Ret_independent <- enrichGO(gene = Ret_independent_entrez,
                 pvalueCutoff  = 1,
                 qvalueCutoff  = 0.05, 
                 readable      = TRUE)
+```
+
+```{r genotype_glia}
+glia_genotype_diff_test <- differentialGeneTest(dat.filtered[expressed_genes, pData(dat.filtered)$celltype == "progenitor/glia" & !pData(dat.filtered)$cluster == 9], fullModelFormulaStr = "~genotype + batch + total_mRNAs", reducedModelFormulaStr = "~batch + total_mRNAs", verbose = T)
+
+glia_genotype_diff_test_sorted <- glia_genotype_diff_test[order(glia_genotype_diff_test$qval),]
+
+write.csv(glia_genotype_diff_test_sorted[glia_genotype_diff_test_sorted$qval < 0.05, c("gene_short_name", "gene_id", "pval", "qval")], file = "DEG_glia!cluster9_genotype.csv", quote = F, row.names = F)
+
+genotype_diff_test_sig_genes <- rownames(genotype_diff_test_sorted[genotype_diff_test_sorted$qval < 0.05,])
 
 ```
+
 
 # Cluster Specificity
 ```{r specificity}
@@ -558,166 +568,4 @@ cowplot::plot_grid(pg1, pg2, ncol = 2)
 
 grid.arrange(p1, p2, p3, p4, p5, p6, p7, p8, ncol = 2)
 
-```
-
-
-```{r}
-cluster_diff_test <- differentialGeneTest(dat.filtered[expressed_genes,],fullModelFormulaStr = "~batch + num_genes_expressed + cluster",reducedModelFormulaStr = "~batch + num_genes_expressed")
-
-cluster_diff_test_sorted <- na.omit(cluster_diff_test[order(cluster_diff_test$qval),])
-
-cluster_diff_test_sorted_sig_genes <- rownames(cluster_diff_test_sorted[cluster_diff_test_sorted$pval < 0.01/length(expressed_genes) & cluster_diff_test_sorted$mean_expr > 1,])
-
-length(cluster_diff_test_sorted_sig_genes)
-
-#tmp <- t(scale(t(exprs(dat.filtered[cluster_diff_test_sorted_sig_genes,])), scale = T, center = T))
-#heatmap_data<-log(tmp -min(tmp) + 1)
-
-heatmap_data <- apply(exprs(dat.filtered)[cluster_diff_test_sorted_sig_genes,], 1,
-                      function(x){
-                        x = log10(x - min(x) + 1)
-                      })
-
-#heatmap_data <- heatmap_data[order.dendrogram(as.dendrogram(hclust(dist(heatmap_data)))),order.dendrogram(as.dendrogram(hclust(dist(t(heatmap_data)))))]
-
-
-
-cluster_colors <- c(brewer.pal(8, "Set2"), brewer.pal(5, "Set3")[5])[pData(dat.filtered)[rownames(heatmap_data), "cluster"]]
-
-pdf("heatmap_test.pdf", width = 10, height = 4)
-heatmap(t(heatmap_data),
-        Rowv = NA,
-        ColSideColors = cluster_colors,
-        Colv = NA,
-        scale = "none",
-        labCol = NA,
-        labRow = lookupGeneName(dat.filtered, cluster_diff_test_sorted_sig_genes),
-        col = inferno(100))
-dev.off()
-#myLower <- 0
-#myUpper <- 2
-
-#heatmap_data[heatmap_data < myLower] <- myLower
-#heatmap_data[heatmap_data > myUpper] <- myUpper
-
-#colnames(heatmap_data) <- lookupGeneName(dat.filtered,colnames(heatmap_data))
-
-heatmap_annotation <- pData(dat.filtered)[,c("parentCelltype", "cluster")]
-colnames(heatmap_annotation) <- c("Cell type","Cluster")
-
-cluster_list <- c(brewer.pal(8, "Set2"), brewer.pal(5, "Set3")[5])
-names(cluster_list) <- c(1:9)
-
-heatmap_colors <- list(
-"Cell type" =  c("Glia" = "#E69F00", 
-                      "Neuron" = "#56B4E9"),
-"Cluster" = cluster_list)
-
-
-pdf("Cluster_diff_test_v1.pdf", height = 18, width = 18, useDingbats = F)
-pheatmap(mat = t(heatmap_data),
-         scale="none",
-         show_rownames = FALSE,
-         show_colnames = FALSE,
-         cellwidth = 1,
-         cellheight = 1,
-         color = inferno(100),
-         border_color = NA,
-         cutree_rows = 9,
-         annotation_col=heatmap_annotation,
-         annotation_colors=heatmap_colors,
-         fontsize_row = 8)
-#         breaks=seq(myLower,myUpper,length=100),)
-dev.off()
-
-#pData(dat.filtered)$celltype_pred_description <- NA
-#Data(dat.filtered)[pData(dat.filtered)$celltype_pred %in% c("ENT4", "ENT5", "ENT6", "ENT9"), "celltype_pred_description"] <- "Cholinergic enteric neurons"
-#pData(dat.filtered)[pData(dat.filtered)$celltype_pred %in% c("ENT1", "ENT2", "ENT3"), "celltype_pred_description"] <- "Nitrergic enteric neurons"
-#pData(dat.filtered)[pData(dat.filtered)$celltype_pred %in% c("ENT7", "ENT8"), "celltype_pred_description"] <- "Cholinergic enteric neurons, VGLUT2"
-#pData(dat.filtered)[pData(dat.filtered)$celltype_pred %in% c("ENTG1"), "celltype_pred_description"] <- "Enteric glia, proliferating"
-#pData(dat.filtered)[is.na(pData(dat.filtered)$celltype_pred_description), "celltype_pred_description"] <- "Enteric glia"
-
-#plotUMAP(dat.filtered, color = "celltype_pred_description", size = 0.1) + 
-#  scale_color_manual("Cell Type Prediction", values = cbPalette[c(1, 6, 2, 4)]) +
-#  theme(plot.title = element_text(size = 10, face = "plain", hjust = 0.02, margin = margin(b = -8)),
-#        strip.background = element_blank(), 
-#        strip.text = element_blank(), 
-#        axis.title = element_text(size = 6),
-#        axis.title.x = element_text(margin = margin(t = -2)),
-#        axis.title.y = element_text(margin = margin(r = -1)),
-#        axis.text = element_text(size = 6),
-#        axis.text.x = element_text(margin = margin(t = -2)),
-#        axis.text.y = element_text(margin = margin(r = -1)),
-#        axis.ticks = element_blank(),
-#        legend.background = element_blank(),
-#        legend.title = element_text(size = 6),
-#        legend.text = element_text(size =6),
-#        legend.position = c(0.26, 0.15),
-#        legend.key.size = unit(0.25, "cm"),
-#        aspect.ratio = 1
-#        ) 
-
-
-#pData(dat.filtered)$final_celltype <- pData(dat.filtered)$CellType
-#pData(dat.filtered)$final_celltype <- as.character(pData(dat.filtered)$final_celltype)
-#pData(dat.filtered)[pData(dat.filtered)$celltype_pred_description == "Nitrergic enteric neurons", "final_celltype"] <- "Nitrergic Neuron"
-#pData(dat.filtered)$final_celltype <- as.factor(pData(dat.filtered)$final_celltype)
-
-#plotUMAP(dat.filtered, color = "final_celltype", size = 1) +
-#  scale_color_manual(values = cbPalette[c(6, 1, 4, 3, 2, 5)]) +
-#  theme_classic() +
-#  theme(aspect.ratio = 1, legend.position = c(0.8, 0.2))
-
-#use confusion matrix to evaluate model with marker gene classification as ground truth
-#tmp <- pData(dat.filtered)[,c("CellType", "celltype_pred_description")]
-#tmp$modelCT <- ifelse(tmp$celltype_pred_description == "Enteric glia", "glia", "neuron")
-
-#tmp$markerCT <- NA
-#tmp[tmp$CellType == "Progenitor/Glia", "markerCT"] <- "glia"
-#tmp[tmp$CellType == "Transition Cell", "markerCT"] <- "transition cell"
-#tmp[is.na(tmp$markerCT),"markerCT"] <- "neuron" 
-#tmp <- tmp[tmp$markerCT != "transition cell",]
-
-#table(tmp[,c("modelCT", "markerCT")])
-
-
-#plotUMAP(dat.filtered, color = "final_celltype", size = 0.1) + 
-#  scale_color_manual("Cell Type", values = c(brewer_pal(palette = "Set1")(5)[1:2], cbPalette[4], brewer_pal(palette = "Set1")(5)[3:5])) +
-#  theme(plot.title = element_text(size = 10, face = "plain", hjust = 0.02, margin = margin(b = -8)),
-#        strip.background = element_blank(), 
-#        strip.text = element_blank(), 
-#        axis.title = element_text(size = 6),
-#        axis.title.x = element_text(margin = margin(t = -2)),
-#        axis.title.y = element_text(margin = margin(r = -1)),
-#        axis.text = element_text(size = 6),
-#        axis.text.x = element_text(margin = margin(t = -2)),
-#        axis.text.y = element_text(margin = margin(r = -1)),
-#        axis.ticks = element_blank(),
-#        legend.background = element_blank(),
-#        legend.title = element_text(size = 6),
-#        legend.text = element_text(size =6),
-#        legend.position = c(0.45, 0.2),
-#        legend.key.size = unit(0.25, "cm"),
-#        aspect.ratio = 1
-#        ) 
-
-#plotUMAP(dat.filtered, color = "CellType", size = 0.1) + 
-#  labs(color = "Marker-Based Cell Type") +
-#  theme(plot.title = element_text(size = 10, face = "plain", hjust = 0.02, margin = margin(b = -8)),
-#        strip.background = element_blank(), 
-#        strip.text = element_blank(), 
-#        axis.title = element_text(size = 6),
-#        axis.title.x = element_text(margin = margin(t = -2)),
-#        axis.title.y = element_text(margin = margin(r = -1)),
-#        axis.text = element_text(size = 6),
-#        axis.text.x = element_text(margin = margin(t = -2)),
-#        axis.text.y = element_text(margin = margin(r = -1)),
-#        axis.ticks = element_blank(),
-#        legend.background = element_blank(),
-#        legend.title = element_text(size = 6),
-#        legend.text = element_text(size =6),
-#        legend.position = c(0.45, 0.2),
-#        legend.key.size = unit(0.25, "cm"),
-#        aspect.ratio = 1
-#        ) 
 ```

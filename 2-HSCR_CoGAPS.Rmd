@@ -59,20 +59,22 @@ plot(as.dendrogram(hclust(dist(t(np25cor)))))
 
 #One-hot encode numeric traits
 
-tmp <- pData(dat.filtered)[,c("genotype", "sex", "age")]
+tmp <- pData(dat.filtered)[,c("genotype", "sex", "age", "celltype")]
 tmp$genotype <- ifelse(tmp$genotype == "het", 0, 1)
 tmp$sex <- ifelse(tmp$sex == "male", 0, 1)
 tmp$age <- ifelse(tmp$age == "E12.5", 0, 1)
+tmp$celltype <- ifelse(tmp$celltype == "neuron", 1, 0)
 
 tmp2 <- pData(dat.filtered) %>% 
-  mutate(condition = paste(age, genotype, sex)) %>%
-  select(celltype, batch, cluster, condition)
+  mutate(condition = paste(age, genotype, sex))
+tmp2 <- tmp2[,c("batch", "cluster", "condition")]
 
 library(caret)
 dmy <- caret::dummyVars("~.", data = tmp2)
-cor_meta <- cbind(tmp, data.frame(predict(dmy, newdata = tmp2)))
+tmp2_pred <- data.frame(predict(dmy, newdata = tmp2))
+cor_meta <- cbind(tmp, tmp2_pred)
 
-cor_meta <- cbind(cor_meta, pData(dat.filtered)[,c("total_mass","total_reads", "alignment_percentage", "num_genes_expressed", "total_mRNAs", "mean_expr","sd_expr")])
+cor_meta <- cbind(cor_meta, pData(dat.filtered)[,c("total_reads", "alignment_percentage", "total_mRNAs", "sd_expr")])
 
 
 np25.cor <- cor(cor_meta, np25.gapsResult@sampleFactors)
@@ -92,8 +94,8 @@ names(tmp3) <- c("metadata", "pattern", "correlation", "pvalue")
 
 meta_meta <- as.data.frame(colnames(cor_meta))
 colnames(meta_meta) <- "metadata"
-meta_meta$label <- c("Genotype", "Sex", "Age", "Progenitor/Glia", "Neuron", "Inhibitory MN", "Excitatory MN", "Batch 1", "Batch 2", "Batch 3", "Batch 4", "Batch 5", "Cluster 1", "Cluster 2", "Cluster 3", "Cluster 4", "Cluster 5", "Cluster 6", "Cluster 7", "Cluster 8", "Cluster 9", "E12.5 Het F", "E12.5 Het M", "E12.5 Hom F", "E12.5 Hom M", "E14.5 Het F", "E14.5 Het M", "E14.5 Hom F", "E14.5 Hom M", "Total mRNA Mass", "Reads", "Alignment %", "# Genes Expr", "# mRNAs", "Mean Expr","SD Expr")
-meta_meta$category <- c(rep("Experimental Var", 3), rep("Cell Type", 4), rep("Batch", 5), rep("Cluster", 9), rep("Condition", 8), rep("Technical Vars", 7))
+meta_meta$label <- c("Genotype", "Sex", "Age", "Cell Type", "Batch 1", "Batch 2", "Batch 3", "Batch 4", "Batch 5", "Cluster 1", "Cluster 2", "Cluster 3", "Cluster 4", "Cluster 5", "Cluster 6", "Cluster 7", "Cluster 8", "Cluster 9", "E12.5 Het F", "E12.5 Het M", "E12.5 Hom F", "E12.5 Hom M", "E14.5 Het F", "E14.5 Het M", "E14.5 Hom F", "E14.5 Hom M", "Reads", "Alignment %","# mRNAs", "SD Expr")
+meta_meta$category <- c(rep("Experimental Var", 3), "Cell Type", rep("Batch", 5), rep("Cluster", 9), rep("Condition", 8), rep("Technical Vars", 4))
 meta_meta$category <- factor(meta_meta$category, levels = c("Experimental Var", "Condition", "Cell Type", "Cluster", "Technical Vars", "Batch"))
 meta_meta <- meta_meta[match(rownames(np25.cor), as.character(meta_meta$metadata)),]
 meta_meta <- meta_meta[order(meta_meta$category),]
@@ -111,12 +113,12 @@ pdf("HSCR_meta_cor.pdf", width = 3.25, height = 4)
 ggplot(tmp4) +
   geom_tile(aes(x = pattern, 
                 y = -y, 
-                fill = ifelse(tmp3$pvalue < cutoff, correlation, NA)), 
+                #fill = ifelse(tmp3$pvalue < cutoff, correlation, NA)), 
+                fill = correlation), 
             color = "black") +
-  scale_fill_viridis("Correlation", 
-                     na.value = "grey80",
-                     limits = c(-1,1),
-                      option = "inferno")  +
+  scale_fill_cmocean("Correlation", 
+                     name = "balance",
+                     limits = c(-1, 1))  +
 #                     breaks = c(0, 0.5, 1)) +
   scale_x_continuous("HSCR Pattern", 
                      breaks = c(1:25), 

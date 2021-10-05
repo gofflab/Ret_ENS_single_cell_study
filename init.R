@@ -84,7 +84,7 @@ plotUMAP <- function(cds, markers = NULL, color_by = NULL, shape = NULL, logMode
 #Helper Utils
 ####################
 lookupGeneId<-function(eset,gene_names, unique = T){
-  res <- rownames(fData(eset))[fData(eset)$gene_short_name %in% gene_names]
+  res <- rownames(fData(eset))[match(gene_names, fData(eset)$gene_short_name)]
   if(unique){
   res <- unique(res)
   }
