@@ -79,11 +79,28 @@ ego_genotype <- enrichGO(gene = genotype_diff_test_entrez,
                 qvalueCutoff  = 0.05, 
                 readable      = TRUE)
 
-write.csv(ego_genotype@result, "DEG_all_cells_genotype_GO.csv")
+write.csv(ego_genotype@result[ego_genotype@result$qvalue < 0.05,], "DEG_all_cells_genotype_GO.csv")
 
-ego_genotype_subset <- ego_genotype@result[c(3,4,6,7,8,10,17,22,23, 30, 34, 39, 41, 43, 44, 46, 48, 52, 56, 57, 58, 65, 66, 78, 95, 99, 101, 103, 104, 106, 107, 113, 119, 128, 148, 159, 162, 177, 179, 180, 182, 183, 191, 194, 195, 203, 210, 223, 224, 225, 232, 245, 254, 255, 258, 262, 264, 265, 266, 267, 268, 269, 278, 281, 282, 285, 297, 299, 300, 302, 308, 312, 320, 334, 346, 353, 354, 355, 369, 370, 378, 382, 385, 388, 399, 419, 422, 423, 428, 440, 441, 464, 471, 482, 483, 488, 494, 497, 516, 519, 534, 569, 578, 596, 598, 608, 617, 622, 626, 636, 692, 710, 712, 717, 719, 720, 727, 744, 756, 757, 768, 769, 776, 784, 787, 793, 794),]
+ego_genotype_subset <- ego_genotype@result[ego_genotype@result$ID %in% c("GO:0007219", "GO:0042063", "GO:0045165", "GO:0061564", "GO:0050768", "GO:0045666", "GO:0001505", "GO:0006584", "GO:0061351", "GO:0014033", "GO:0045787", "GO:0030335", "GO:0070371", "GO:0042552", "GO:0009952", "GO:0010718", "GO:0098727", "GO:0043405", "GO:0051302", "GO:0050808", "GO:1990138", "GO:0007088"),]
 
-ego_genotype_subset <- ego_genotype_subset[!ego_genotype_subset$ID %in% c("GO:0009713", "GO:0042423", "GO:0009712", "GO:0042416", "GO:0007272", "GO:008366", "GO:0007096", "GO:0055057", "GO:0046879", "GO:0014009", "GO:0051961", "GO:0007411", "GO:0050433", "GO:0050432", "GO:0014032", "GO:0042415", "GO:0008344", "GO:0014014", "GO:0014015", "GO:0030852"),]
+ego_genotype_subset$Description <- factor(ego_genotype_subset$Description, levels = rev(ego_genotype_subset$Description))
+
+pdf("DEG_all_cells_genotype_GO_plot.pdf", height = 4, width = 8, useDingbats = F)
+ggplot(ego_genotype_subset) +
+  geom_col(aes(x = Description, y = Count, fill = qvalue)) +
+  scale_x_discrete("GO:BP Term") +
+  scale_y_continuous("# Genes", expand = c(0,0)) +
+  scale_fill_viridis("q-value", limits = c(0, 0.05), breaks = c(0, 0.05), option = "plasma") +
+  coord_flip() +
+  theme(legend.position = c(0.7, 0.2), 
+        legend.background = element_blank(),
+        legend.title = element_text(size = 12),
+        legend.text = element_text(size = 10),
+        axis.text = element_text(size = 10), 
+        axis.title = element_text(size = 12),
+        axis.title.y = element_text(margin = margin(r = -10)),
+        axis.title.x = element_text(margin = margin(t = -2)))
+dev.off()
 ```
 
 ```{r genotype:sex}
@@ -156,7 +173,7 @@ ego_genotype_sex <- enrichGO(gene = genotype_sex_diff_test_entrez,
                 qvalueCutoff  = 0.05, 
                 readable      = TRUE)
 
-write.csv(ego_genotype_sex@result, "DEG_all_cells_genotypeXsex_GO.csv")
+write.csv(ego_genotype_sex@result[ego_genotype_sex@result$qvalue < 0.05,], "DEG_all_cells_genotypeXsex_GO.csv")
 ```
 
 ```{r genotype:celltype}
@@ -225,7 +242,7 @@ ego_genotype_celltype <- enrichGO(gene = genotypeCellType_diff_test_entrez,
                 qvalueCutoff  = 0.05, 
                 readable      = TRUE)
 
-write.csv(ego_genotype_celltype@result, "DEG_all_cells_genotypeXcelltype_GO.csv")
+write.csv(ego_genotype_celltype@result[ego_genotype_celltype@result$qvalue < 0.05,], "DEG_all_cells_genotypeXcelltype_GO.csv")
 ```
 
 ```{r neuron_bifurcation_diff_test}
@@ -301,7 +318,7 @@ ego_bifurcation <- enrichGO(gene = bifurcation_entrez,
                 qvalueCutoff  = 0.05, 
                 readable      = TRUE)
 
-write.csv(ego_bifurcation@result, "DEG_clusters7&8_cluster_GO.csv")
+write.csv(ego_bifurcation@result[ego_bifurcation@result$qvalue < 0.05,], "DEG_clusters7&8_cluster_GO.csv")
 ```
 
 ```{r Ret_independent_genotype_diff}
@@ -386,7 +403,7 @@ ego_Ret_independent <- enrichGO(gene = Ret_independent_entrez,
                 qvalueCutoff  = 0.05, 
                 readable      = TRUE)
 
-write.csv(ego_Ret_independent@result, "DEG_cluster8_genotype_GO.csv")
+write.csv(ego_Ret_independent@result[ego_Ret_independent@result$qvalue < 0.05,], "DEG_cluster8_genotype_GO.csv")
 ```
 
 ```{r genotype_glia}
@@ -397,6 +414,56 @@ glia_genotype_diff_test_sorted <- glia_genotype_diff_test[order(glia_genotype_di
 write.csv(glia_genotype_diff_test_sorted[glia_genotype_diff_test_sorted$qval < 0.05, c("gene_short_name", "gene_id", "pval", "qval")], file = "DEG_glia!cluster9_genotype.csv", quote = F, row.names = F)
 
 glia_genotype_diff_test_sig_genes <- rownames(glia_genotype_diff_test_sorted[glia_genotype_diff_test_sorted$qval < 0.05,])
+
+heatmap_data <- log10(exprs(dat.filtered)[glia_genotype_diff_test_sig_genes, pData(dat.filtered)$celltype == "progenitor/glia" & !pData(dat.filtered)$cluster == 9] + 1) # log transform
+heatmap_data <- t(apply(heatmap_data, 1, function(x){ # Normalize gene expr by dividing by max
+  x/max(x)
+}))
+
+rownames(heatmap_data) <- lookupGeneName(dat.filtered, rownames(heatmap_data))
+
+heatmap_data <- heatmap_data[order.dendrogram(as.dendrogram(hclust(dist(heatmap_data)))),order.dendrogram(as.dendrogram(hclust(dist(t(heatmap_data)))))]
+
+#myLower <- 0.1
+#myUpper <- 0.9
+
+#heatmap_data[heatmap_data < myLower] <- myLower
+#heatmap_data[heatmap_data > myUpper] <- myUpper
+
+heatmap_annotation <- pData(dat.filtered)[pData(dat.filtered)$celltype == "progenitor/glia" & !pData(dat.filtered)$cluster == 9, c("genotype", "cluster")]
+
+
+heatmap_colors <- list(
+  "Genotype" = c("het" = brewer.pal(3, "Set1")[1], 
+                 "hom" = brewer.pal(3, "Set1")[2]),
+  "Cluster" = c("1" = brewer.pal(8, "Set2")[1], 
+                "2" = brewer.pal(8, "Set2")[2], 
+                "3" = brewer.pal(8, "Set2")[3], 
+                "4" = brewer.pal(8, "Set2")[4], 
+                "5" = brewer.pal(8, "Set2")[5], 
+                "6" = brewer.pal(8, "Set2")[6])
+  )
+
+colnames(heatmap_annotation) <- c("Genotype", "Cluster")
+
+pdf("DEG_glia!cluster9_genotype_heatmap.pdf", height = 24, width = 20)
+pheatmap(mat = heatmap_data,
+         scale="none",
+         show_rownames = TRUE,
+         show_colnames = FALSE,
+         drop_levels = FALSE,
+         cluster_rows = T,
+         cluster_cols = T,
+         color = viridis(100),
+         annotation_col = heatmap_annotation,
+         annotation_colors = heatmap_colors,
+         annotation_names_col = TRUE,
+         annotation_legend = TRUE,
+         fontsize_row = 2,
+         treeheight_col = 60,
+         treeheight_row = 0
+         )
+dev.off()
 
 egENSEMBL <- toTable(org.Mm.egENSEMBL)
 
@@ -411,7 +478,34 @@ ego_glia_genotype <- enrichGO(gene = glia_genotype_entrez,
                 qvalueCutoff  = 0.05, 
                 readable      = TRUE)
 
-write.csv(ego_glia_genotype@result, "DEG_glia!cluster9_genotype_GO.csv")
+ego_glia_genotype_significant <- ego_glia_genotype@result[ego_glia_genotype@result$qvalue < 0.05,]
+
+write.csv(ego_glia_genotype@result[ego_glia_genotype@result$qvalue < 0.05,], "DEG_glia!cluster9_genotype_GO.csv")
+
+glia_terms <- c("GO:0042063", "GO:0045165", "GO:0014033", "GO:0061351", "GO:0045787", 
+                "GO:0042552", "GO:0007088", "GO:0045786", "GO:0000132", "GO:0051302", 
+                "GO:0000082")
+
+ego_glia_subset <- ego_glia_genotype@result[glia_terms,]
+
+ego_glia_subset$Description <- factor(ego_glia_subset$Description, levels = rev(ego_glia_subset$Description))
+
+pdf("F4B-DEG_glia!cluster9_genotype_GO_plot.pdf", height = 2.5, width = 6, useDingbats = F)
+ggplot(ego_glia_subset) +
+  geom_col(aes(x = Description, y = Count, fill = qvalue)) +
+  scale_x_discrete("GO:BP Term") +
+  scale_y_continuous("# Genes", expand = c(0,0)) +
+  scale_fill_viridis("q-value", limits = c(0, 0.05), breaks = c(0, 0.05), option = "plasma") +
+  coord_flip() +
+  theme(legend.position = c(0.77, 0.35), 
+        legend.background = element_blank(),
+        legend.title = element_text(size = 12),
+        legend.text = element_text(size = 10),
+        axis.text = element_text(size = 10), 
+        axis.title = element_text(size = 12),
+        axis.title.y = element_text(margin = margin(r = -10), hjust = 0.6),
+        axis.title.x = element_text(margin = margin(t = -2)))
+dev.off()
 ```
 
 
@@ -433,6 +527,11 @@ mean_expr_cluster <- mean_expr_cluster[,-1]
 #Data frame of mean expression for each gene in each cluster
 
 cluster_specificity <- cummeRbund:::.specificity(mean_expr_cluster)
+
+tmp <- as.data.frame(lookupGeneName(dat.filtered, rownames(cluster_specificity)))
+names(tmp) <- "gene_name"
+
+write.csv(cbind(tmp, cluster_specificity), "cluster_specificity_scores.csv")
 
 melted_cluster_specificity <- melt(cluster_specificity)
 mean_expr_cluster_melted <- melt(mean_expr_cluster)
@@ -493,10 +592,7 @@ plot_specificity <- function(x){
 }
 
 
-plot_specificity(4) + ggtitle("Cluster 4: Ache+")
-plot_specificity(5) + ggtitle("Cluster 5: Nos1+")
-plot_specificity(7) + ggtitle("Cluster 7: Maturing Glia")
-plot_specificity(8) + ggtitle("Cluster 8: Th+, Dbh+")
+p1 <- plot_specificity(1)
 p2 <- plot_specificity(2)
 p3 <- plot_specificity(3)
 p4 <- plot_specificity(4)
@@ -504,12 +600,8 @@ p5 <- plot_specificity(5)
 p6 <- plot_specificity(6)
 p7 <- plot_specificity(7)
 p8 <- plot_specificity(8)
+p9 <- plot_specificity(9)
 
-pg1 <- cowplot::plot_grid(p1, p3, p5, p7, rel_widths = 1, ncol = 1)
-pg2 <- cowplot::plot_grid(p2, p4, p6, p8, rel_widths = 1, ncol = 1)
-
-cowplot::plot_grid(pg1, pg2, ncol = 2)      
-
-grid.arrange(p1, p2, p3, p4, p5, p6, p7, p8, ncol = 2)
+grid.arrange(p1, p2, p3, p4, p5, p6, p7, p8, p9, ncol = 2)
 
 ```

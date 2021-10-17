@@ -18,7 +18,7 @@ library(corrplot)
 library(projectR)
 
 #add shape arg to UMAP
-plotUMAP <- function(cds, markers = NULL, color_by = NULL, shape = NULL, logMode = T, scaled = F, size = 1.5, ...){
+plotUMAP <- function(cds, markers = NULL, color_by = NULL, shape = NULL, logMode = T, scaled = F, size = 1.5, nrow = NULL, ncol = NULL, ...){
   pheno <- pData(cds)
   expr <- exprs(cds)
   features <- fData(cds)
@@ -59,7 +59,7 @@ plotUMAP <- function(cds, markers = NULL, color_by = NULL, shape = NULL, logMode
       }
     }
     if(length(markers) > 1){
-      p <- p + facet_wrap('gene_short_name')
+      p <- p + facet_wrap('gene_short_name', nrow = nrow, ncol = ncol)
     }else{
       p <- p + ggtitle(markers)
     }
