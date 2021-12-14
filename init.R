@@ -18,7 +18,7 @@ library(corrplot)
 library(projectR)
 
 #add shape arg to UMAP
-plotUMAP <- function(cds, markers = NULL, color_by = NULL, shape = NULL, logMode = T, scaled = F, size = 1.5, nrow = NULL, ncol = NULL, ...){
+plotUMAP <- function(cds, markers = NULL, color_by = NULL, shape = NULL, logMode = T, scaled = F, size = 1.5, nrow = NULL, ncol = NULL, sort = T,...){
   pheno <- pData(cds)
   expr <- exprs(cds)
   features <- fData(cds)
@@ -27,7 +27,7 @@ plotUMAP <- function(cds, markers = NULL, color_by = NULL, shape = NULL, logMode
       warning(paste(paste0(markers[!markers %in% features$gene_short_name], collapse = ", " ), "is/are not valid gene names"))
       markers <- markers[markers %in% features$gene_short_name]
     }
-    genes <- expr[rownames(features) %in% lookupGeneId(cds, markers), , drop = F]
+    genes <- expr[lookupGeneId(cds, markers), , drop = F]
     if(logMode){
       genes <- log10(genes + 1)
     }
@@ -38,8 +38,12 @@ plotUMAP <- function(cds, markers = NULL, color_by = NULL, shape = NULL, logMode
     genes <- t(genes)
     genes <- melt(genes)
     colnames(genes) <- c("cell_id", "gene_id", "value")
-    genes <- merge(genes, features[, c("gene_id", "gene_short_name")], by.x = "gene_id", by.y = "gene_id", all.x = TRUE, sort = FALSE)
-    tmp <- merge(pheno, genes, by.x = 0, by.y = "cell_id", sort = FALSE)
+    genes <- merge(genes, features[, c("gene_id", "gene_short_name")], by = "gene_id", all.x = TRUE)
+    tmp <- merge(genes, pheno, by.x = "cell_id", by.y = 0)
+    if(!sort){
+      tmp$gene_short_name <- factor(tmp$gene_short_name, levels = markers) 
+    }
+      
     if(!is.null(shape)){
       shape <- rep(pheno[, shape], length(markers))
     } 

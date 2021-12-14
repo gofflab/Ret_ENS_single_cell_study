@@ -45,6 +45,17 @@ dat.relative <- newCellDataSet(cellData = as.matrix(fpkms),
                       featureData = fd)
 ```
 
+```{r}
+pca.1 <- prcomp(t(exprs(dat.relative)), scale = F, center = T)
+
+ggbiplot(pca.1, groups = pData(dat.relative)$genotype, var.axes = F, ellipse) +
+  scale_color_viridis(discrete = T) +
+  scale_x_continuous(limits = c(-0.07, 0)) +
+  scale_y_continuous(limits = c(-0.05, 0.07)) +
+  theme(aspect.ratio = 1)
+```
+
+
 # Remove Outliers
 ### Remove cells with low alignment rates
 Cells with total reads in the bottom 5% and an alignment rate below 50% were removed (**Figure 1**).
@@ -54,15 +65,21 @@ read_min <- (pData(dat.relative)[order(pData(dat.relative)$total_reads),"total_r
 ```
 
 ```{r include = F}
-pdf("Figure 1a.pdf")
-
-ggplot(pData(dat.relative)) + 
-  geom_point(aes(x=log10(total_reads),y=alignment_percentage, col = ifelse(pData(dat.relative)$total_reads < read_min & pData(dat.relative)$alignment_percentage < 50, "Removed", "Kept"))) +
+pdf("AlignmentByReads.pdf", height = 4, width = 6, useDingbats = F)
+ggplot(pData(dat.relative)[!pData(dat.relative)$num_cells == 2,]) + 
+  geom_point(aes(x=log10(total_reads),
+                 y=alignment_percentage, 
+                 col = as.factor(num_cells)), size = 0.2) +
   geom_vline(xintercept = log10(read_min), lty = "dashed") +
   geom_hline(yintercept = 50, lty = "dashed") +
-  labs(x = "Log10(Total Number of Reads)", y = "% Reads Aligned", col = "Status") +
-  scale_color_manual(values = c("black", "red"))
-
+  guides(color = guide_legend(title = "Well", override.aes = list(size = 2.5))) +
+  labs(x = "Log10(Total Number of Reads)", y = "% Reads Aligned") +
+  scale_color_manual(values = c("red", "black"), breaks = c("1", "0"), labels = c("Cell", "Empty")) +
+  theme(aspect.ratio = 1,
+        legend.position = "none",
+        axis.title = element_text(size = 12),
+        axis.text = element_text(size = 10)
+  )
 dev.off()
 
 p1 <- pData(dat.relative) %>%
@@ -111,82 +128,67 @@ p7 <- ggplot(pData(dat.relative)) +
   scale_color_discrete(breaks = legend$source_plate,
                        labels = legend$group)
 
-p8 <- ggplot(pData(dat.relative)) + 
-  geom_point(aes(x = total_reads, y = alignment_percentage, col = index_set)) +
-  stat_ellipse(aes(x = total_reads, y = alignment_percentage, col = index_set), type = "norm") +
-  labs(x = "Total Number of Reads", y = "% Reads Aligned", color = "Index Set")
- 
-p9 <- ggplot(pData(dat.relative)) + 
-  geom_point(aes(x = total_reads, y = alignment_percentage, col = index_1)) +
-  stat_ellipse(aes(x = total_reads, y = alignment_percentage, col = index_1), type = "norm") +
-  labs(x = "Total Number of Reads", y = "% Reads Aligned", color = "Column Index")
-  
-p10 <- ggplot(pData(dat.relative)) + 
-  geom_point(aes(x = total_reads, y = alignment_percentage, col = index_2)) +
-  stat_ellipse(aes(x = total_reads, y = alignment_percentage, col = index_2), type = "norm") +
-  labs(x = "Total Number of Reads", y = "% Reads Aligned", color = "Row Index")
 
-p11 <- ggplot(pData(dat.relative)) + 
-  geom_point(aes(x = total_reads, y = alignment_percentage, col = factor(num_cells))) +
-  stat_ellipse(aes(x = total_reads, y = alignment_percentage, col = factor(num_cells)), type = "norm") +
+p8 <- ggplot(pData(dat.relative)[!pData(dat.relative)$num_cells == 2,]) + 
+  geom_point(aes(x = log10(total_reads), y = alignment_percentage, col = factor(num_cells))) +
+  stat_ellipse(aes(x = log10(total_reads), y = alignment_percentage, col = factor(num_cells)), type = "norm") +
   labs(x = "Total Number of Reads", y = "% Reads Aligned", color = "Number of Cells per Well")
 
-p12 <- ggplot(pData(dat.relative)) + 
+p9 <- ggplot(pData(dat.relative)) + 
   geom_point(aes(x = total_reads, y = alignment_percentage, col = factor(sort_date))) +
   stat_ellipse(aes(x = total_reads, y = alignment_percentage, col = factor(sort_date)), type = "norm") +
   labs(x = "Total Number of Reads", y = "% Reads Aligned", color = "Sort Date")
 
-pdf("Figure 1b.pdf")
+# manually grid plots to force same size regardless of legends/axis text
+#grid.draw(
+#  rbind(
+#    cbind(ggplotGrob(p1),
+#          ggplotGrob(p2),
+#          ggplotGrob(p3),
+#          ggplotGrob(p4),
+#          size="last"),
+#    cbind(ggplotGrob(p5),
+#          ggplotGrob(p6),
+#          ggplotGrob(p7),
+#          ggplotGrob(p8),
+#          size="last"),
+#    cbind(ggplotGrob(p9),
+#          ggplotGrob(p10),
+#          ggplotGrob(p11),
+#          ggplotGrob(p12),
+#          size="last"),
+#    size="last")
+#)
 
-grid.draw(
-  rbind(
-    cbind(ggplotGrob(p1),
-          ggplotGrob(p2),
-          ggplotGrob(p3),
-          ggplotGrob(p4),
-          size="last"),
-    cbind(ggplotGrob(p5),
-          ggplotGrob(p6),
-          ggplotGrob(p7),
-          ggplotGrob(p8),
-          size="last"),
-    cbind(ggplotGrob(p9),
-          ggplotGrob(p10),
-          ggplotGrob(p11),
-          ggplotGrob(p12),
-          size="last"),
-    size="last")
-)
-
-dev.off()
-
-pdf("Figure 1c.pdf")
-
+pdf("Alignment_distribution_by_condition.pdf", height = 5, width = 8, useDingbats = F)
 pData(dat.relative) %>%
-  mutate(group = paste(age, sex, genotype)) %>%
+  mutate(group = paste(age, sex)) %>%
   ggplot(.) + 
-  stat_density(aes(x = alignment_percentage), fill = "gray70", color = "gray60", alpha = 0.3) +
+  geom_density(aes(x = alignment_percentage, fill = genotype), alpha = 0.4) +
   facet_wrap(~group) +
-  scale_fill_brewer(palette = "Set1") +
-  scale_color_brewer(palette = "Set1") +
+  scale_fill_manual(breaks = c("het", "hom"), values = c("gray10", "darkred")) +
+  scale_y_continuous(limits = c(0, 0.1), expand = c(0,0), breaks = c(0, 0.05, 0.1)) +
+  scale_x_continuous(limits = c(0, 100), expand = c(0,0)) +
   theme_bw() +
+  theme(aspect.ratio = 1) +
   ggtitle("Alignment Distributions")
-
 dev.off()
 
-pdf("Figure 1d.pdf")
 
+pdf("Read_distribution_by_condition.pdf", height = 3, width = 8, useDingbats = F)
 pData(dat.relative) %>%
-  mutate(group = paste(age, sex, genotype)) %>%
+  mutate(group = paste(age, sex)) %>%
   ggplot(.) + 
-  stat_density(aes(x = total_reads), fill = "gray70", color = "gray60", alpha = 0.3) +
-  facet_wrap(~group) +
-  scale_fill_brewer(palette = "Set1") +
-  scale_color_brewer(palette = "Set1") +
+  geom_density(aes(x = log10(total_reads), fill = genotype), alpha = 0.4) +
+  facet_wrap(~group, nrow = 1) +
+  scale_fill_manual(breaks = c("het", "hom"), values = c("gray10", "darkred")) +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_continuous(expand = c(0,0)) +
   theme_bw() +
-  ggtitle("Read Distributions")
-
+  theme(aspect.ratio = 1) +
+  ggtitle("Total Reads Distributions")
 dev.off()
+
 ```
 
 ```{r}
@@ -510,19 +512,31 @@ ggbiplot(dat.filtered.pca, var.axes = F, groups = pData(dat.filtered)$genotype, 
   ggtitle("PC1 vs. PC2") + 
   scale_color_brewer("Genotype", palette = "Set1") +  
   geom_point(aes(color = pData(dat.filtered)$genotype), size = 0.6)
-# reminder - genotype is biased by age (more hets in E12.5 than E14.5)
 
-p1 <- ggbiplot(dat.filtered.pca, var.axes = F, groups = pData(dat.filtered)$num_genes_expressed, alpha = 0) + 
-  theme(aspect.ratio = 1,plot.title = element_text(size = 12), axis.title = element_text(size = 8), legend.title = element_text(size = 8), legend.text = element_text(size = 7)) + 
+p1 <- ggbiplot(dat.filtered.pca, 
+               var.axes = F, 
+               groups = log10(pData(dat.filtered)$total_reads)) + 
+  scale_color_viridis("# reads") +
   ggtitle("PC1 vs. PC2") + 
-  scale_color_continuous(name = "Number\nof Genes\nExpressed") +  
-  geom_point(aes(color = pData(dat.filtered)$num_genes_expressed), size = 0.6)
+  theme(aspect.ratio = 1,
+        plot.title = element_text(size = 12), 
+        axis.title = element_text(size = 8), 
+        legend.title = element_text(size = 8), 
+        legend.text = element_text(size = 7))
 
-p2 <- ggbiplot(dat.filtered.pca, var.axes = F, groups = pData(dat.filtered)$batch, alpha = 0) + 
-  theme(aspect.ratio = 1, plot.title = element_text(size = 12), axis.title = element_text(size = 8), legend.title = element_text(size = 8), legend.text = element_text(size = 7)) + 
+pdf("PC1vsPC2-batch.pdf", height = 4, width = 5, useDingbats = F)
+ggbiplot(dat.filtered.pca, var.axes = F, groups = pData(dat.filtered)$batch, alpha = 0, ellipse = T) +
   ggtitle("PC1 vs. PC2") + 
-  scale_color_brewer("Batch", palette = "Set1") +  
-  geom_point(aes(color = pData(dat.filtered)$batch), size = 0.6)
+  scale_color_viridis("Batch", discrete = T, option = "B") +  
+  geom_point(aes(color = pData(dat.filtered)$batch), size = 0.6) +
+  theme(aspect.ratio = 1, 
+        legend.position = c(0.7, 0.2),
+        plot.title = element_text(size = 12), 
+        axis.title = element_text(size = 10), 
+        axis.text = element_text(size = 10),
+        legend.title = element_text(size = 10), 
+        legend.text = element_text(size = 10))
+dev.off()
 
 p3 <- ggbiplot(dat.filtered.pca, var.axes = F, groups = pData(dat.filtered)$sex, alpha = 0) + 
   theme(aspect.ratio = 1, plot.title = element_text(size = 12), axis.title = element_text(size = 8), legend.title = element_text(size = 8), legend.text = element_text(size = 7)) + 
@@ -549,6 +563,23 @@ ggplot(pData(dat.filtered), aes(x = genotype)) +
   labs(x = "Genotype and Sex", y = "# Cells", title = "Cells Passing Filters")  +
   theme(plot.title = element_text(size = 12), axis.title = element_text(size = 10), legend.text = element_text(size = 8)) +
   scale_y_continuous(expand = expand_scale(mult = c(0, .05)))
+```
+
+```{r}
+pdf("Read_distribution_by_condition_filtered.pdf", height = 3, width = 8, useDingbats = F)
+pData(dat.filtered) %>%
+  mutate(group = paste(age, sex)) %>%
+  ggplot(.) + 
+  geom_density(aes(x = log10(total_reads), fill = genotype), alpha = 0.4) +
+  facet_wrap(~group, nrow = 1) +
+  scale_fill_manual(breaks = c("het", "hom"), values = c("gray10", "darkred")) +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_continuous(expand = c(0,0)) +
+  theme_bw() +
+  theme(aspect.ratio = 1) +
+  ggtitle("Total Reads Distributions")
+dev.off()
+
 ```
 
 ```{r saveCDS, echo = F}

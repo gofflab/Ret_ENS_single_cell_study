@@ -22,30 +22,26 @@ pData(dat.filtered) <- cbind(pData(dat.filtered), assigned$scores)
 p1 <- ggplot(pData(dat.filtered), aes(x = UMAP1, y = UMAP2, color = G1)) +
   geom_point(size = 0.1) +
   ggtitle("G1") +
-  scale_color_viridis("Probability", limits = c(0, 1), breaks = c(0, 0.5, 1)) +
+  scale_color_viridis("Probability", limits = c(0, 1), breaks = c(0, 1), option = "inferno") +
   theme(plot.title = element_text(size = 10, face = "plain", hjust = 0.02, margin = margin(b = -8)),
-        strip.background = element_blank(), 
-        strip.text = element_blank(), 
-        axis.title.x = element_text(size = 6, margin = margin(t = -2)),
-        axis.title.y = element_text(size = 6, margin = margin(r = -1)),
-        axis.text.x = element_text(size = 6, margin = margin(t = -2)),
-        axis.text.y = element_text(size = 6, margin = margin(r = -1)),
+        axis.title = element_text(size = 10),
+        axis.text = element_blank(),
         axis.ticks = element_blank(),
-        legend.position = "none",
+        legend.background = element_blank(),
+        legend.title = element_text(size = 6),
+        legend.text = element_text(size =6),
+        legend.position = c(0.65, 0.25),
+        legend.key.size = unit(0.25, "cm"),
         aspect.ratio = 1
         )
  
 p2 <- ggplot(pData(dat.filtered), aes(x = UMAP1, y = UMAP2, color = S)) +
   geom_point(size = 0.1) +
   ggtitle("S") +
-  scale_color_viridis("Probability", limits = c(0, 1), breaks = c(0, 0.5, 1)) +
+  scale_color_viridis(option = "inferno") +
   theme(plot.title = element_text(size = 10, face = "plain", hjust = 0.02, margin = margin(b = -8)),
-        strip.background = element_blank(), 
-        strip.text = element_blank(), 
-        axis.title.x = element_text(size = 6, margin = margin(t = -2)),
-        axis.title.y = element_text(size = 6, margin = margin(r = -1)),
-        axis.text.x = element_text(size = 6, margin = margin(t = -2)),
-        axis.text.y = element_text(size = 6, margin = margin(r = -1)),
+        axis.title = element_text(size = 10),
+        axis.text = element_blank(),
         axis.ticks = element_blank(),
         legend.position = "none",
         aspect.ratio = 1
@@ -54,63 +50,54 @@ p2 <- ggplot(pData(dat.filtered), aes(x = UMAP1, y = UMAP2, color = S)) +
 p3 <- ggplot(pData(dat.filtered), aes(x = UMAP1, y = UMAP2, color = G2M)) +
   geom_point(size = 0.1) +
   ggtitle("G2/M") +
-  scale_color_viridis("Probability", limits = c(0, 1), breaks = c(0, 0.5, 1)) +
+  scale_color_viridis(option = "inferno") +
   theme(plot.title = element_text(size = 10, face = "plain", hjust = 0.02, margin = margin(b = -8)),
-        strip.background = element_blank(), 
-        strip.text = element_blank(), 
-        axis.title = element_text(size = 6),
-        axis.title.x = element_text(margin = margin(t = -2)),
-        axis.title.y = element_text(margin = margin(r = -1)),
-        axis.text = element_text(size = 6),
-        axis.text.x = element_text(margin = margin(t = -2)),
-        axis.text.y = element_text(margin = margin(r = -1)),
+        axis.title = element_text(size = 10),
+        axis.text = element_blank(),
         axis.ticks = element_blank(),
-        legend.background = element_blank(),
-        legend.title = element_text(size = 6),
-        legend.text = element_text(size =6),
-        legend.position = c(0.65, 0.25),
-        legend.key.size = unit(0.25, "cm"),
+        legend.position = "none",
         aspect.ratio = 1
         ) 
 
+pdf("Cyclone_probabilities.pdf", width = 6, height = 5.5, useDingbats = F)
 grid.arrange(p1, p2, p3, ncol = 3)
+dev.off()
 
-p1 <- pData(dat.filtered)[pData(dat.filtered)$final_celltype == "Progenitor/Glia",] %>%
-  mutate(condition = paste(age, genotype)) %>%
-  ggplot(., aes(G1, color = condition)) + 
-  stat_ecdf(geom = "step") +
-  theme(aspect.ratio = 1, legend.position = "none", plot.title = element_blank()) +
-  labs(y = "Cumulative Density", x = "Probability(G1)") +
-  scale_y_continuous(expand = c(0, 0)) +
-  scale_x_continuous(expand = c(0, 0))
+#subset projection weights by condition (age*genotype)
+a <- pData(dat.filtered)[pData(dat.filtered)$age == "E12.5" & pData(dat.filtered)$genotype == "het", c("G1", "S", "G2M")]
+b <- pData(dat.filtered)[pData(dat.filtered)$age == "E12.5" & pData(dat.filtered)$genotype == "hom", c("G1", "S", "G2M")]
+c <- pData(dat.filtered)[pData(dat.filtered)$age == "E14.5" & pData(dat.filtered)$genotype == "het", c("G1", "S", "G2M")]
+d <- pData(dat.filtered)[pData(dat.filtered)$age == "E14.5" & pData(dat.filtered)$genotype == "hom", c("G1", "S", "G2M")]
 
-p2 <- pData(dat.filtered)[pData(dat.filtered)$final_celltype == "Progenitor/Glia",] %>%
-  mutate(condition = paste(age, genotype)) %>%
-  ggplot(., aes(S, color = condition)) + 
-  stat_ecdf(geom = "step") +
-  theme(aspect.ratio = 1, legend.position = c(0.5, 0.25), plot.title = element_blank()) +
-  labs(x = "Probability(S)", y = "") +
-  scale_y_continuous(expand = c(0, 0)) +
-  scale_x_continuous(expand = c(0, 0))
+# 6 pairwise tests for each pattern
+# Bonferonni correction - multiply p by 6
+# * p < 0.05/6
+# ** p < 0.01/6
 
-p3 <- pData(dat.filtered)[pData(dat.filtered)$final_celltype == "Progenitor/Glia",] %>%
-  mutate(condition = paste(age, genotype)) %>%
-  ggplot(., aes(G2M, color = condition)) + 
-  stat_ecdf(geom = "step") +
-  theme(aspect.ratio = 1, legend.position = "none", plot.title = element_blank()) +
-  labs(x = "Probability(G2M)", y = "") +
-  scale_y_continuous(expand = c(0, 0)) +
-  scale_x_continuous(expand = c(0, 0))
+#G1
+ks.test(a$G1, b$G1) # p = 0.283 (E12.5 genotype) ### n.s.
+ks.test(a$G1, c$G1) # p = 1.72e-6 (het age) ######## **
+ks.test(a$G1, d$G1) # p = 1.80e-5 (age*genotype) ### **
+ks.test(b$G1, c$G1) # p = 4.75e-8 (age*genotype) ### **
+ks.test(b$G1, d$G1) # p = 6.59e-6 (hom age) ######## **
+ks.test(c$G1, d$G1) # p = 2.14e-3 (E14.5 genotype) # *
 
-a <- pData(dat.filtered)[pData(dat.filtered)$age == "E12.5" & pData(dat.filtered)$genotype == "het", "S"]
+#S Phase
+ks.test(a$S, b$S) # p = 0.763 (E12.5 genotype) # n.s.
+ks.test(a$S, c$S) # p < 2.2e-16 (het age) ###### **
+ks.test(a$S, d$S) # p = 1.35e-4 (age*genotype) # **
+ks.test(b$S, c$S) # p < 2.2e-16 (age*genotype) # **
+ks.test(b$S, d$S) # p = 1.94e-4 (hom age) ###### **
+ks.test(c$S, d$S) # p = 0.634 (E14.5 genotype) # n.s.
 
-b <- pData(dat.filtered)[pData(dat.filtered)$age == "E12.5" & pData(dat.filtered)$genotype == "hom", "G1"]
+#G2M Phase
+ks.test(a$G2M, b$G2M) # p = 0.245 (E12.5 genotype) ## n.s.
+ks.test(a$G2M, c$G2M) # p = 9.34e-4 (het age) ####### **
+ks.test(a$G2M, d$G2M) # p = 0.0184 (age*genotype) ### n.s.
+ks.test(b$G2M, c$G2M) # p = 6.88e-4 (age*genotype) ## **
+ks.test(b$G2M, d$G2M) # p = 1.55e-3 (hom age) ####### **
+ks.test(c$G2M, d$G2M) # p = 0.0955 (E14.5 genotype) # n.s.
 
-c <- pData(dat.filtered)[pData(dat.filtered)$age == "E14.5" & pData(dat.filtered)$genotype == "het", "G2M"]
-
-d <- pData(dat.filtered)[pData(dat.filtered)$age == "E14.5" & pData(dat.filtered)$genotype == "hom", "G2M"]
-
-ks.test(a, d)
 
 grid.arrange(p1, p2, p3, ncol = 3)
 
@@ -131,8 +118,7 @@ p1 <- pData(dat.filtered) %>%
         axis.title = element_text(size = 8),
         axis.title.y = element_text(margin = margin(r = 0)),
         axis.title.x = element_text(margin = margin(t = -2)),
-        axis.text = element_text(size = 6)) +
-  coord_flip()
+        axis.text = element_text(size = 6))
 
 p2 <- pData(dat.filtered) %>%
   mutate(condition = paste(age, genotype)) %>%
@@ -150,8 +136,7 @@ p2 <- pData(dat.filtered) %>%
         axis.title = element_text(size = 8),
         axis.title.y = element_text(margin = margin(r = 0)),
         axis.title.x = element_text(margin = margin(t = -2)),
-        axis.text = element_text(size = 6)) +
-  coord_flip()
+        axis.text = element_text(size = 6))
 
 p3 <- pData(dat.filtered) %>%
   mutate(condition = paste(age, genotype)) %>%
@@ -171,37 +156,95 @@ p3 <- pData(dat.filtered) %>%
         axis.title = element_text(size = 8),
         axis.title.y = element_text(margin = margin(r = 0)),
         axis.title.x = element_text(margin = margin(t = -2)),
-        axis.text = element_text(size = 6)) +
-  coord_flip()
+        axis.text = element_text(size = 6))
 
 grid.arrange(p1, p2, p3, ncol = 3)
 
-pData(dat.filtered)$CC_phase <- c("G1", "S", "G2M")[apply(pData(dat.filtered)[,c("G1", "S", "G2M")], 1, which.max)]
-
-plotUMAP(dat.filtered, color = "CC_phase", size = 0.8) +
-  theme_classic() +
-  theme(aspect.ratio = 1, legend.position = c(0.8, 0.2))
-
-freqdat <- pData(dat.filtered) %>%
-  group_by(age, genotype,CC_phase) %>% 
-  count() %>%
-  group_by(age, genotype) %>%
-  mutate(freq = n/sum(n)) %>% 
-  mutate(condition = paste(genotype, CC_phase))
-
-ggplot(freqdat, aes(x = age, y = freq, group = condition, color = CC_phase, lty = genotype)) +
-  geom_line() +
-  geom_point() +
-  scale_color_brewer(palette = "Set1") +
-  scale_y_continuous(limits = c(0, 1), expand = c(0,0)) +
-  scale_x_discrete(expand = c(0.05, 0.05))
+pData(dat.filtered)$cyclone_class <- c("G1", "S", "G2M")[apply(pData(dat.filtered)[,c("G1", "S", "G2M")], 1, which.max)]
+pData(dat.filtered)$cyclone_class <- factor(pData(dat.filtered)$cyclone_class, levels = c("G1", "S", "G2M"))
+pData(dat.filtered)$cyclone_maxP <- apply(pData(dat.filtered)[,c("G1", "S", "G2M")], 1, max)
 
 
-tmp <- pData(dat.filtered)[,c("source_plate", "age", "genotype", "CC_phase")] %>%
-  mutate(condition = paste(age, genotype))
-tmp2 <- as.data.frame(table(tmp[,c("source_plate", "CC_phase")]))
-tmp3 <- merge(tmp2, unique(tmp[,c("source_plate", "condition")]), by = "source_plate")
-tmp3$condition <- as.factor(tmp3$condition)
+p <- ggplot(pData(dat.filtered)) +
+  geom_point(aes(x=UMAP1, y=UMAP2, 
+                 color = cyclone_class,
+                 alpha = cyclone_maxP), size = 0.7,
+             shape = 16) +
+  scale_color_manual(values = brewer.pal(n = 7, name = "Dark2")[c(7, 1, 2)]) +
+  scale_alpha(range = c(0,1)) +
+  ggtitle("Maximum Probability Map") +
+  theme(aspect.ratio = 1,
+        plot.title = element_text(face = "plain"),
+        axis.title = element_text(size = 12),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        legend.position = "none"
+  )
+
+pdf("cyclone_MPM.pdf", width = 3, height = 3, useDingbats = F)
+p
+dev.off()
+
+
+p1 <- pData(dat.filtered) %>%
+  mutate(condition = paste(age, genotype)) %>%
+  ggplot(., aes(G1, color = condition, lty = condition)) + 
+  stat_ecdf(geom = "step") +
+  ggtitle("G1") +
+  scale_y_continuous("Cumulative Density", expand = c(0, 0), breaks = c(0, 0.5, 1), labels = c("0", "0.5", "1")) +
+  scale_x_continuous("Probability", expand = c(0, 0), breaks = c(0, 0.5, 1), labels = c("0", "0.5", "1"), limits = c(0, 1.001)) +
+  scale_color_manual("Age, Genotype", values = c("E12.5 het" = "#E41A1C", "E12.5 hom" = "#377EB8", "E14.5 het" = "#E41A1C", "E14.5 hom" = "#377EB8")) +
+  scale_linetype_manual("Age, Genotype", values = c("E12.5 het" = "solid", "E12.5 hom" = "solid", "E14.5 het" = "dotted", "E14.5 hom" = "dotted")) +
+  theme(aspect.ratio = 1, 
+        legend.position = c(0.55, 0.25), 
+        legend.text = element_text(size = 8),
+        legend.title = element_text(size = 10),
+        plot.title = element_text(size = 10, face = "plain", hjust = 0.02, margin = margin(b = 0)),
+        plot.margin = margin(2, 2, 2, 2),
+        axis.title.y = element_text(size = 8, margin = margin(r = 0)),
+        axis.title.x = element_text(size = 8, margin = margin(t = -2)),
+        axis.text = element_text(size = 6)
+        )
+
+p2 <- pData(dat.filtered) %>%
+  mutate(condition = paste(age, genotype)) %>%
+  ggplot(., aes(S, color = condition, lty = condition)) + 
+  stat_ecdf(geom = "step") +
+  ggtitle("S") +
+  scale_y_continuous("Cumulative Density", expand = c(0, 0), breaks = c(0, 0.5, 1), labels = c("0", "0.5", "1")) +
+  scale_x_continuous("Probability", expand = c(0, 0), breaks = c(0, 0.5, 1), labels = c("0", "0.5", "1"), limits = c(0, 1.001)) +
+  scale_color_manual("Age, Genotype", values = c("E12.5 het" = "#E41A1C", "E12.5 hom" = "#377EB8", "E14.5 het" = "#E41A1C", "E14.5 hom" = "#377EB8")) +
+  scale_linetype_manual("Age, Genotype", values = c("E12.5 het" = "solid", "E12.5 hom" = "solid", "E14.5 het" = "dotted", "E14.5 hom" = "dotted")) +
+  theme(aspect.ratio = 1, 
+        legend.position = "none", 
+        plot.title = element_text(size = 10, face = "plain", hjust = 0.02, margin = margin(b = 0)),
+        plot.margin = margin(2, 2, 2, 2),
+        axis.title.y = element_text(size = 8, margin = margin(r = 0)),
+        axis.title.x = element_text(size = 8, margin = margin(t = -2)),
+        axis.text = element_text(size = 6)
+        )
+
+p3 <- pData(dat.filtered) %>%
+  mutate(condition = paste(age, genotype)) %>%
+  ggplot(., aes(G2M, color = condition, lty = condition)) + 
+  stat_ecdf(geom = "step") +
+  ggtitle("G2M") +
+  scale_y_continuous("Cumulative Density", expand = c(0, 0), breaks = c(0, 0.5, 1), labels = c("0", "0.5", "1")) +
+  scale_x_continuous("Probability", expand = c(0, 0), breaks = c(0, 0.5, 1), labels = c("0", "0.5", "1"), limits = c(0, 1.001)) +
+  scale_color_manual("Age, Genotype", values = c("E12.5 het" = "#E41A1C", "E12.5 hom" = "#377EB8", "E14.5 het" = "#E41A1C", "E14.5 hom" = "#377EB8")) +
+  scale_linetype_manual("Age, Genotype", values = c("E12.5 het" = "solid", "E12.5 hom" = "solid", "E14.5 het" = "dotted", "E14.5 hom" = "dotted")) +
+  theme(aspect.ratio = 1, 
+        legend.position = "none", 
+        plot.title = element_text(size = 10, face = "plain", hjust = 0.02, margin = margin(b = 0)),
+        plot.margin = margin(2, 2, 2, 2),
+        axis.title.y = element_text(size = 8, margin = margin(r = 0)),
+        axis.title.x = element_text(size = 8, margin = margin(t = -2)),
+        axis.text = element_text(size = 6)
+        )
+
+pdf("cyclone_ecdf_MPM.pdf", width = 10.5, height = 2, useDingbats = F)
+grid.arrange(p1, p2, p3, nrow = 1)
+dev.off()
 
 
 
@@ -660,29 +703,41 @@ c <- CC_patterns$projection[CC_patterns$projection$age == "E14.5" & CC_patterns$
 d <- CC_patterns$projection[CC_patterns$projection$age == "E14.5" & CC_patterns$projection$genotype == "hom", c(paste0("Pattern_", 40:42), "max_value")]
 
 # 6 pairwise tests for each pattern
+# Bonferonni correction - multiply p by 6
 # * p < 0.05/6
 # ** p < 0.01/6
 
+#S Phase
 ks.test(a$Pattern_40, b$Pattern_40) # p = 0.1931, E12.5 het vs E12.5 hom (genotype)
 ks.test(a$Pattern_40, c$Pattern_40) # p < 2.2e-16 **, E12.5 het vs. E14.5 het (age)
+  ks.test(a$Pattern_40, c$Pattern_40)[[2]]*6
 ks.test(a$Pattern_40, d$Pattern_40) # p < 2.2e-16 **, E12.5 het vs E14.5 hom (age*genotype)
 ks.test(b$Pattern_40, c$Pattern_40) # p < 2.2e-16 **, E12.5 hom vs. E14.5 het (age*genotype)
 ks.test(b$Pattern_40, d$Pattern_40) # p = 3.331e-16 **, E12.5 hom vs. E14.5 hom (age)
+  ks.test(b$Pattern_40, d$Pattern_40)[[2]]*6
 ks.test(c$Pattern_40, d$Pattern_40) # p = 1.609e-5 **, E14.5 het vs. E14.5 hom (genotype)
+  ks.test(c$Pattern_40, d$Pattern_40)[[2]]*6
 
+#Early M
 ks.test(a$Pattern_41, b$Pattern_41) # p = 0.02552 (E12.5 genotype)
 ks.test(a$Pattern_41, c$Pattern_41) # p < 2.2e-16 ** (het age)
 ks.test(a$Pattern_41, d$Pattern_41) # p < 2.2e-16 ** (age*genotype)
 ks.test(b$Pattern_41, c$Pattern_41) # p < 2.2e-16 ** (age*genotype)
 ks.test(b$Pattern_41, d$Pattern_41) # p = 6.395e-14 ** (hom age)
+  ks.test(b$Pattern_41, d$Pattern_41)[[2]]*6
 ks.test(c$Pattern_41, d$Pattern_41) # p = 3.279e-5 ** (E14.5 genotype)
+  ks.test(c$Pattern_41, d$Pattern_41)[[2]]*6
 
+#Late M
 ks.test(a$Pattern_42, b$Pattern_42) # p = 0.3977 (E12.5 genotype)
 ks.test(a$Pattern_42, c$Pattern_42) # p < 2.308e-9 ** (het age)
+  ks.test(a$Pattern_42, c$Pattern_42)[[2]]*6
 ks.test(a$Pattern_42, d$Pattern_42) # p < 2.976e-9 ** (age*genotype)
 ks.test(b$Pattern_42, c$Pattern_42) # p < 1.591e-11 ** (age*genotype)
 ks.test(b$Pattern_42, d$Pattern_42) # p = 3.234e-10 ** (hom age)
+  ks.test(b$Pattern_42, d$Pattern_42)[[2]]*6
 ks.test(c$Pattern_42, d$Pattern_42) # p = 0.003222 * (E14.5 genotype)
+  ks.test(c$Pattern_42, d$Pattern_42)[[2]]*6
 
 ks.test(a$max_value, b$max_value) # p = 0.1784 (E12.5 genotype)
 ks.test(a$max_value, c$max_value) # p < 2.2e-16 ** (het age)
@@ -734,7 +789,7 @@ merge(pData(dat.filtered)[,c("age", "genotype", "cluster")], normalized_projecti
   scale_linetype_manual("Age, Genotype", values = c("E12.5 het" = "solid", "E12.5 hom" = "solid", "E14.5 het" = "dotted", "E14.5 hom" = "dotted")) +
   theme(aspect.ratio = 1, 
         strip.background = element_blank(),
-        legend.position = c(0.75, 0.15), 
+        legend.position = "none", 
         plot.margin = margin(0, 2, 0, 0),
         axis.title = element_text(size = 8),
         axis.title.y = element_text(margin = margin(r = 0)),

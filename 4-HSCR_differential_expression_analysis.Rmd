@@ -187,50 +187,6 @@ genotypeCellType_diff_test_sig_genes<-rownames(genotypeCellType_diff_test_sorted
 
 length(genotypeCellType_diff_test_sig_genes)
 
-heatmap_data <- log10(exprs(dat.filtered)[genotypeCellType_diff_test_sig_genes,] + 1) # log transform
-heatmap_data <- t(apply(heatmap_data, 1, function(x){ # Normalize gene expr by dividing by SD
-  x/sd(x)
-}))
-#tmp <- t(scale(t(exprs(dat.filtered[genotypeCellType_diff_test_sorted_sig_genes,])),scale = T,center = T))
-#heatmap_data <- log(tmp -min(tmp) + 1)
-
-#myLower <- 0
-#myUpper <- 6
-
-#heatmap_data[heatmap_data < myLower] <- myLower
-#heatmap_data[heatmap_data > myUpper] <- myUpper
-
-rownames(heatmap_data) <- lookupGeneName(dat.filtered,rownames(heatmap_data))
-heatmap_data <- heatmap_data[order.dendrogram(as.dendrogram(hclust(dist(heatmap_data)))),order.dendrogram(as.dendrogram(hclust(dist(t(heatmap_data)))))]
-
-heatmap_annotation <- pData(dat.filtered)[,c("celltype","genotype")]
-
-heatmap_colors <- list(
-"Cell Type" =  c("neuron" = "#377EB8", "progenitor/glia" = "#984EA3"),
-"Genotype" = c("het" = "black", "hom" = "gray70"),
-"Age" = c("E12.5" = "#7FC97F", "E14.5" = "#BEAED4"))
-
-colnames(heatmap_annotation) <- c("Cell Type","Genotype")
-
-pdf("heatmap_DEG_genotype-celltype.pdf", height = 20, width = 20)
-pheatmap(mat = heatmap_data,
-         scale="none",
-         show_rownames = TRUE,
-         show_colnames = FALSE,
-         drop_levels = FALSE,
-         cluster_rows = F,
-         cluster_cols = F,
-         color = viridis(100),
-         annotation_col = heatmap_annotation,
-         #annotation_colors = heatmap_colors,
-         annotation_names_col = TRUE,
-         annotation_legend = TRUE,
-         fontsize_row = 5,
-         treeheight_col = 0,
-         treeheight_row = 0
-         )
-dev.off()
-
 genotypeCellType_diff_test_entrez <- gsub("\\..*","", genotypeCellType_diff_test_sig_genes)
 m <- match(genotypeCellType_diff_test_entrez, egENSEMBL$ensembl_id)
 genotypeCellType_diff_test_entrez <- egENSEMBL$gene_id[m]
@@ -242,7 +198,132 @@ ego_genotype_celltype <- enrichGO(gene = genotypeCellType_diff_test_entrez,
                 qvalueCutoff  = 0.05, 
                 readable      = TRUE)
 
+
+ego_genotype_celltype_subset1 <- ego_genotype_celltype@result[ego_genotype_celltype@result$ID %in% 
+                                                                c("GO:0007059", "GO:0006260", "GO:0045787", "GO:0044770", "GO:0006281", 
+                                                                  "GO:0045786", "GO:1902850", "GO:0007051", "GO:0051383", "GO:0071103", 
+                                                                  "GO:0051321", "GO:0033044", "GO:0051656", "GO:0006310", "GO:0034502", 
+                                                                  "GO:0000910", "GO:0051302", "GO:0007219", "GO:0042136", "GO:0010718",
+                                                                  "GO:0042063"),]
+
+ego_genotype_celltype_subset1$Description <- factor(ego_genotype_celltype_subset1$Description, levels = rev(ego_genotype_celltype_subset1$Description))
+
+pdf("DEG_all_cells_genotypeXcelltype_GO_plot.pdf", height = 3.5, width = 8, useDingbats = F)
+ggplot(ego_genotype_celltype_subset1) +
+  geom_col(aes(x = Description, y = Count, fill = qvalue)) +
+  scale_x_discrete("GO:BP Term") +
+  scale_y_continuous("# Genes", expand = c(0,0)) +
+  scale_fill_viridis("q-value", limits = c(0, 0.05), breaks = c(0, 0.05), option = "plasma") +
+  coord_flip() +
+  theme(legend.position = c(0.7, 0.25), 
+        legend.background = element_blank(),
+        legend.title = element_text(size = 12),
+        legend.text = element_text(size = 10),
+        axis.text = element_text(size = 10), 
+        axis.title = element_text(size = 12),
+#        axis.title.y = element_text(margin = margin(r = -10)),
+        axis.title.x = element_text(margin = margin(t = -2)))
+dev.off()
+
 write.csv(ego_genotype_celltype@result[ego_genotype_celltype@result$qvalue < 0.05,], "DEG_all_cells_genotypeXcelltype_GO.csv")
+
+gene_ids <- str_split(ego_genotype_celltype_subset1$geneID, "\\/")
+names(gene_ids) <- str_remove(ego_genotype_celltype_subset1$ID, ":")
+tmp <- lapply(gene_ids, function(x){lookupGeneName(dat.filtered, genotypeCellType_diff_test_sig_genes) %in% x})
+heatmap_annotation_row <- do.call(cbind, tmp)
+heatmap_annotation_row <- as.data.frame(ifelse(heatmap_annotation_row, 1, 0))
+
+S_terms <- c("GO0006260", #DNA replication
+         "GO0006281" #DNA repair
+)
+EarlyMidM_terms <- c("GO1902850", # microtubule cytoskeleton organization involved in mitosis
+                  "GO0007051", # spindle organization
+                  "GO0051383", # kinetochore organization
+                  "GO0007059" # chromosome segregation
+                  ) 
+LateM_terms <- c("GO0000910", # cytokinesis
+                 "GO0051302" # regulation of cell division
+                 )
+PhaseTransition_terms <- "GO0044770" #cell cycle phase transition
+
+
+
+heatmap_annotation_row$S_phase <- apply(heatmap_annotation_row[,S_terms], 1, function(x){
+  ifelse(sum(x) > 0, 1, 0)
+})
+
+heatmap_annotation_row$EarlyMidM_phase <- apply(heatmap_annotation_row[,EarlyMidM_terms], 1, function(x){
+  ifelse(sum(x) > 0, 1, 0)
+})
+
+heatmap_annotation_row$LateM_phase <- apply(heatmap_annotation_row[,LateM_terms], 1, function(x){
+  ifelse(sum(x) > 0, 1, 0)
+})
+
+
+heatmap_annotation_row <- as.data.frame(apply(heatmap_annotation_row, 2, as.factor))
+rownames(heatmap_annotation_row) <- lookupGeneName(dat.filtered, genotypeCellType_diff_test_sig_genes)
+
+heatmap_annotation_row <- heatmap_annotation_row[, c("S_phase", "EarlyMidM_phase", "LateM_phase", "GO0042063", "GO0007219", "GO0042136", "GO0010718")]
+
+heatmap_data <- log10(exprs(dat.filtered)[genotypeCellType_diff_test_sig_genes,] + 1) # log transform
+heatmap_data <- t(apply(heatmap_data, 1, function(x){ # Normalize gene expr by dividing by SD
+  x/max(x)
+}))
+
+rownames(heatmap_data) <- lookupGeneName(dat.filtered,rownames(heatmap_data))
+heatmap_data_neurons <- heatmap_data[,rownames(pData(dat.filtered)[pData(dat.filtered)$celltype == "neuron",])]
+heatmap_data_neurons <- heatmap_data_neurons[,order.dendrogram(as.dendrogram(hclust(dist(t(heatmap_data_neurons)))))]
+
+heatmap_data_glia <- heatmap_data[,rownames(pData(dat.filtered)[!pData(dat.filtered)$celltype == "neuron",])]
+heatmap_data_glia <- heatmap_data_glia[,order.dendrogram(as.dendrogram(hclust(dist(t(heatmap_data_glia)))))]
+
+heatmap_data <- cbind(heatmap_data_neurons, heatmap_data_glia)
+
+heatmap_data <- heatmap_data[order.dendrogram(as.dendrogram(hclust(dist(heatmap_data)))),]
+
+#heatmap_data <- heatmap_data[order.dendrogram(as.dendrogram(hclust(dist(heatmap_data)))),order.dendrogram(as.dendrogram(hclust(dist(t(heatmap_data)))))]
+
+heatmap_annotation_col <- pData(dat.filtered)[,c("celltype","genotype")]
+
+writeLines(paste0("\"", c("GO0007059", "GO0006260", "GO0045787", "GO0044770", "GO0006281", 
+               "GO0045786", "GO1902850", "GO0007051", "GO0051383", "GO0071103", 
+               "GO0051321", "GO0033044", "GO0051656", "GO0006310", "GO0034502", 
+               "GO0000910", "GO0051302", "GO0007219", "GO0042136", "GO0010718",
+               "GO0042063"), "\" = c(\"1\" = \"black\", \"0\" = \"grey90\")"), sep = ",\n")
+
+heatmap_colors <- list(
+"Cell Type" =  c("neuron" = "#E69F00", "progenitor/glia" = "#56B4E9"),
+"Genotype" = c("het" = "#E41A1C", "hom" = "#377EB8"),
+
+"S phase" = c("1" = brewer.pal(7, "Dark2")[1], "0" = "grey90"),
+"early-mid M phase" = c("1" = brewer.pal(7, "Dark2")[2], "0" = "grey90"),
+"late M phase" = c("1" = brewer.pal(7, "Dark2")[3], "0" = "grey90"),
+"gliogenesis" = c("1" = brewer.pal(7, "Dark2")[4], "0" = "grey90"),
+"Notch signaling" = c("1" = brewer.pal(7, "Dark2")[5], "0" = "grey90"),
+"neurotransmitter biosynthetic process" = c("1" = brewer.pal(7, "Dark2")[6], "0" = "grey90"),
+"epithelial to mesenchymal transition" = c("1" = brewer.pal(7, "Dark2")[7], "0" = "grey90")
+)
+
+colnames(heatmap_annotation_col) <- c("Cell Type","Genotype")
+colnames(heatmap_annotation_row) <- c("S phase", "early-mid M phase", "late M phase", "gliogenesis", "Notch signaling", "neurotransmitter biosynthetic process", "epithelial to mesenchymal transition")
+
+pdf("heatmap_DEG_genotype-celltype.pdf", height = 20, width = 20)
+pheatmap(mat = heatmap_data,
+         scale="none",
+         show_rownames = FALSE,
+         show_colnames = FALSE,
+         drop_levels = FALSE,
+         cluster_rows = F,
+         cluster_cols = F,
+         color = viridis(100),
+         annotation_col = heatmap_annotation_col,
+         annotation_row = heatmap_annotation_row,
+         annotation_colors = heatmap_colors,
+         annotation_names_col = TRUE,
+         annotation_legend = TRUE
+         )
+dev.off()
 ```
 
 ```{r neuron_bifurcation_diff_test}
@@ -506,102 +587,4 @@ ggplot(ego_glia_subset) +
         axis.title.y = element_text(margin = margin(r = -10), hjust = 0.6),
         axis.title.x = element_text(margin = margin(t = -2)))
 dev.off()
-```
-
-
-# Cluster Specificity
-```{r specificity}
-melted_df <- melt(exprs(dat.filtered[expressed_genes,]))
-colnames(melted_df) <- c("gene_id","cell_id","value")
-melted_df <- merge(melted_df, pData(dat.filtered)[, c("genotype", "sex", "age", "cluster")], by.x = "cell_id", by.y = 0)
-
-mean_expr_cluster <- melted_df %>%
-  group_by(cluster, gene_id) %>%
-  summarise(mean_expression_cluster = mean(value)) %>%
-  as.data.frame()
-
-mean_expr_cluster <- dcast(mean_expr_cluster, gene_id ~ cluster)
-rownames(mean_expr_cluster) <- mean_expr_cluster$gene_id
-mean_expr_cluster <- mean_expr_cluster[,-1]
-
-#Data frame of mean expression for each gene in each cluster
-
-cluster_specificity <- cummeRbund:::.specificity(mean_expr_cluster)
-
-tmp <- as.data.frame(lookupGeneName(dat.filtered, rownames(cluster_specificity)))
-names(tmp) <- "gene_name"
-
-write.csv(cbind(tmp, cluster_specificity), "cluster_specificity_scores.csv")
-
-melted_cluster_specificity <- melt(cluster_specificity)
-mean_expr_cluster_melted <- melt(mean_expr_cluster)
-names(mean_expr_cluster_melted) <- c("cluster","mean_expr")
-mean_expr_cluster_melted$gene_id <- rep(row.names(mean_expr_cluster), nlevels(pData(dat.filtered)$cluster))
-melted_cluster_specificity$Var2 <- as.numeric(str_replace(melted_cluster_specificity$Var2, pattern = "_spec", replacement = ""))
-names(melted_cluster_specificity) <- c("gene_id", "cluster", "specificity")
-melted_df <- merge(melted_cluster_specificity, mean_expr_cluster_melted, by = c("gene_id", "cluster"))
-melted_df$gene_short_name <- lookupGeneName(dat.filtered, as.character(melted_df$gene_id), unique = F)
-
-index <- apply(cluster_specificity, 1, which.max)
-gene_specificity <- list()
-for(i in 1:nlevels(pData(dat.filtered)$cluster)){
-  gene_specificity[[i]] <- lookupGeneName(dat.filtered, names(index[index == i]))
-}
-
-apply(cluster_specificity, 2, function(x){
-  lookupGeneName(dat.filtered, names(x)[order(x)[1:10]])
-})
-
-
-plot_specificity <- function(x){
-  ggplot(melted_df[melted_df$cluster == x,], aes(x = log10(mean_expr + 1), 
-                                        y = specificity, 
-                                        label = ifelse(melted_df[melted_df$cluster == x,]$gene_short_name %in% gene_specificity[[x]],
-                                                       melted_df[melted_df$cluster == x,]$gene_short_name, 
-                                                       ""), 
-                                        color = ifelse(ifelse(melted_df[melted_df$cluster == x,]$gene_short_name %in% gene_specificity[[x]],
-                                                       melted_df[melted_df$cluster == x,]$gene_short_name, 
-                                                       "") == "", "no", "yes"), 
-                                        #alpha = ifelse(ifelse(melted_df[melted_df$cluster == x,]$gene_short_name %in% genes[[x]],
-                                        #               melted_df[melted_df$cluster == x,]$gene_short_name, 
-                                        #               "") == "", 0.1, 1)
-                                        )) +
-#  ggtitle(paste("Cluster", x)) +
-      geom_point(size = 0.5) +
-      #geom_smooth(lwd = 0.2, color = "red") +
-      scale_color_manual(values = c("no" = "black", "yes" = "red")) +
-      scale_x_continuous("log10(mean expression + 1)", expand = c(0,0), limits = c(0, 3.5)) +
-      scale_y_continuous("Specificity", expand = c(0,0), limits = c(0,1)) +
-      geom_text(size = 1.4, 
-                hjust = 0, 
-                vjust = 0, 
-                nudge_x = 0.03, 
-                nudge_y = -0.005, 
-                color = "black") +
-      theme(legend.position = "none",
-            plot.title = element_text(size = 10, hjust = 0.005, vjust = -6, face = "plain"),
-            plot.margin = margin(-10, 2, 2, 2),
-            axis.title = element_text(size= 8),
-            axis.title.x = element_text(margin = margin(t = 0)),
-            axis.title.y = element_text(margin = margin(r = 0)),
-            axis.text = element_text(size = 6),
-            #axis.title = element_blank(),
-            #axis.text = element_blank(),
-            aspect.ratio = 1
-            )
-}
-
-
-p1 <- plot_specificity(1)
-p2 <- plot_specificity(2)
-p3 <- plot_specificity(3)
-p4 <- plot_specificity(4)
-p5 <- plot_specificity(5)
-p6 <- plot_specificity(6)
-p7 <- plot_specificity(7)
-p8 <- plot_specificity(8)
-p9 <- plot_specificity(9)
-
-grid.arrange(p1, p2, p3, p4, p5, p6, p7, p8, p9, ncol = 2)
-
 ```

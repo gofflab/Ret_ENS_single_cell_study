@@ -18,8 +18,9 @@ expressed_genes <- readRDS("expressed_genes.rds")
 Subset the uncorrected Cell Data Set by batch to determine overdispersed genes within each batch and take the insection of genes overdispersed in both batches.
 ```{r subset_by_batch, include = F}
 dat.batch1 <- dat.filtered[, pData(dat.filtered)$batch == "HD01"]
-dat.batch1 <- estimateSizeFactors(dat.batch1)
-dat.batch1 <- estimateDispersions(dat.batch1, cores = detectCores()-1)
+dat.batch1 <- monocle:::estimateSizeFactorsForCellDataSet(dat.batch1)
+dat.batch1 <- monocle:::estimateDispersionsForCellDataSet(dat.batch1, modelFormulaStr = "~1", relative_expr = TRUE, removeOutliers = TRUE,
+  min_cells_detected = 1)
 disp_table.batch1 <- dispersionTable(dat.batch1)
 disp_table.batch1$gene_id<-as.character(disp_table.batch1$gene_id)
 unsup_clustering_genes.batch1 <- disp_table.batch1[disp_table.batch1$dispersion_empirical >= 1.5*(disp_table.batch1$dispersion_fit),'gene_id']
@@ -152,17 +153,18 @@ ggbiplot(normalized.pca,var.axes=F,groups=pData(dat.filtered.expressed.normalize
 
 ```{r subset_by_batch_normalized,include=F}
 dat.batch1<-dat.filtered.expressed.normalized[,pData(dat.filtered.expressed.normalized)$batch == "HD01"]
-dat.batch1<-estimateSizeFactors(dat.batch1)
-dat.batch1<-estimateDispersions(dat.batch1,cores=detectCores()-1)
+#dat.batch1<-estimateSizeFactors(dat.batch1)
+dat.batch1 <- monocle:::estimateDispersionsForCellDataSet(dat.batch1, modelFormulaStr = "~1", relative_expr = TRUE, removeOutliers = TRUE,
+  min_cells_detected = 1)
 disp_table.batch1 <- dispersionTable(dat.batch1)
 disp_table.batch1$gene_id<-as.character(disp_table.batch1$gene_id)
 unsup_clustering_genes.batch1 <- disp_table.batch1[disp_table.batch1$dispersion_empirical >= 1.4*(disp_table.batch1$dispersion_fit),'gene_id']
 dat.batch1 <- setOrderingFilter(dat.batch1, unsup_clustering_genes.batch1)
-p.1<-plot_ordering_genes(dat.batch1) + ggtitle("Genes Overdispersed in Batch 1")
+p.1<-plot_ordering_genes(dat.batch1) + ggtitle("Genes Overdispersed in Batch 1") #2309
 
 dat.batch2<-dat.filtered.expressed.normalized[,pData(dat.filtered.expressed.normalized)$batch == "HD02"]
-dat.batch2<-estimateSizeFactors(dat.batch2)
-dat.batch2<-estimateDispersions(dat.batch2,cores=detectCores()-1)
+#dat.batch2<-estimateSizeFactors(dat.batch2)
+#dat.batch2<-estimateDispersions(dat.batch2,cores=detectCores()-1)
 disp_table.batch2 <- dispersionTable(dat.batch2)
 disp_table.batch2$gene_id<-as.character(disp_table.batch2$gene_id)
 unsup_clustering_genes.batch2 <- disp_table.batch2[disp_table.batch2$dispersion_empirical >= 1.4*(disp_table.batch2$dispersion_fit),'gene_id']
@@ -170,8 +172,8 @@ dat.batch2 <- setOrderingFilter(dat.batch2, unsup_clustering_genes.batch2)
 p.2<-plot_ordering_genes(dat.batch2) + ggtitle("Genes Overdispersed in Batch 2")
 
 dat.batch3<-dat.filtered.expressed.normalized[,pData(dat.filtered.expressed.normalized)$batch == "HD03_pool_1"]
-dat.batch3<-estimateSizeFactors(dat.batch3)
-dat.batch3<-estimateDispersions(dat.batch3,cores=detectCores()-1)
+#dat.batch3<-estimateSizeFactors(dat.batch3)
+#dat.batch3<-estimateDispersions(dat.batch3,cores=detectCores()-1)
 disp_table.batch3 <- dispersionTable(dat.batch3)
 disp_table.batch3$gene_id<-as.character(disp_table.batch3$gene_id)
 unsup_clustering_genes.batch3 <- disp_table.batch3[disp_table.batch3$dispersion_empirical >= 1.4*(disp_table.batch3$dispersion_fit),'gene_id']
@@ -179,8 +181,8 @@ dat.batch3 <- setOrderingFilter(dat.batch3, unsup_clustering_genes.batch3)
 p.3<-plot_ordering_genes(dat.batch3) + ggtitle("Genes Overdispersed in Batch 3")
 
 dat.batch4<-dat.filtered.expressed.normalized[,pData(dat.filtered.expressed.normalized)$batch == "HD03_pool_2"]
-dat.batch4<-estimateSizeFactors(dat.batch4)
-dat.batch4<-estimateDispersions(dat.batch4,cores=detectCores()-1)
+#dat.batch4<-estimateSizeFactors(dat.batch4)
+#dat.batch4<-estimateDispersions(dat.batch4,cores=detectCores()-1)
 disp_table.batch4 <- dispersionTable(dat.batch4)
 disp_table.batch4$gene_id<-as.character(disp_table.batch4$gene_id)
 unsup_clustering_genes.batch4 <- disp_table.batch4[disp_table.batch4$dispersion_empirical >= 1.4*(disp_table.batch4$dispersion_fit),'gene_id']
@@ -240,6 +242,8 @@ pData(dat.filtered) %>%
   geom_point(aes(x = UMAP1,y = UMAP2, col = condition)) +
   scale_color_brewer("Condition", palette = "Paired") +
   theme(legend.position = c(0.6, 0.2), legend.text = element_text(size = 18), legend.title = element_text(size = 20))
+
+pca.3 <- prcomp(t(exprs(dat.filtered.expressed.normalized[fData(dat.filtered.expressed.normalized)$use_for_ordering,])), scale = F, center = T)
 ```
 
 ```{r clustering}
@@ -447,6 +451,170 @@ plotUMAP(dat.filtered, color = "celltype", size = 0.1) +
         legend.text = element_text(size = 6),
         legend.title = element_text(size = 8)
         ) 
+dev.off()
+```
+
+```{r}
+naiveProportion.ex <- (table(pData(dat.filtered)$genotype)/sum(table(pData(dat.filtered)$genotype)))[2]
+E12.5naiveProportion.ex <- (table(pData(dat.filtered)[pData(dat.filtered)$age == "E12.5","genotype"])/sum(table(pData(dat.filtered)[pData(dat.filtered)$age == "E12.5","genotype"])))[2]
+
+E12.5celltypeByGenotype.ex <- table(pData(dat.filtered)[pData(dat.filtered)$age == "E12.5","celltype"], pData(dat.filtered)[pData(dat.filtered)$age == "E12.5","genotype"])
+
+E12.5celltypeByGenotype.chisq.test.ex <- apply(E12.5celltypeByGenotype.ex, MARGIN = 1, function(x){
+  prop.test(x[2], sum(x), alternative = "two.sided", correct = TRUE, p = E12.5naiveProportion.ex)$p.value
+})
+
+E12.5celltypeByGenotype.df.ex <- 
+  data.frame(index = c(1:length(unique(pData(dat.filtered)$celltype))), 
+             pval = E12.5celltypeByGenotype.chisq.test.ex, sig = " ")
+E12.5celltypeByGenotype.df.ex$sig <- as.character(E12.5celltypeByGenotype.df.ex$sig)
+E12.5celltypeByGenotype.df.ex$sig[E12.5celltypeByGenotype.df.ex$pval <= 0.01/2] <- "*"
+
+
+E14.5naiveProportion.ex <- (table(pData(dat.filtered)[pData(dat.filtered)$age == "E14.5","genotype"])/sum(table(pData(dat.filtered)[pData(dat.filtered)$age == "E14.5","genotype"])))[2]
+
+E14.5celltypeByGenotype.ex <- table(pData(dat.filtered)[pData(dat.filtered)$age == "E14.5","celltype"], pData(dat.filtered)[pData(dat.filtered)$age == "E14.5","genotype"])
+
+E14.5celltypeByGenotype.chisq.test.ex <- apply(E14.5celltypeByGenotype.ex, MARGIN = 1, function(x){
+  prop.test(x[2], sum(x), alternative = "two.sided", correct = TRUE, p = E14.5naiveProportion.ex)$p.value
+})
+
+E14.5celltypeByGenotype.df.ex <- 
+  data.frame(index = c(1:length(unique(pData(dat.filtered)$celltype))), 
+             pval = E14.5celltypeByGenotype.chisq.test.ex, sig = " ")
+E14.5celltypeByGenotype.df.ex$sig <- as.character(E14.5celltypeByGenotype.df.ex$sig)
+E14.5celltypeByGenotype.df.ex$sig[E14.5celltypeByGenotype.df.ex$pval <= 0.01/2] <- "*"
+
+pdf("celltype_proportion.pdf", height = 3, width = 3)
+ggplot(pData(dat.filtered)) + 
+  geom_bar(aes(x = celltype, color = celltype, fill = genotype), position = "fill") + 
+  facet_wrap(~age) +
+  #scale_fill_brewer("Genotype", palette = "Set1", labels = c("RetCFP/+", "RetCFP/CFP")) + 
+  scale_fill_manual(values = c("gray70", "darkred"), guide = F) + 
+  scale_color_manual(values = cbPalette[1:2], guide = F) + 
+  geom_hline(aes(yintercept = E12.5naiveProportion.ex), linetype = "dashed", col = "black") +
+  geom_hline(aes(yintercept = E14.5naiveProportion.ex), linetype = "dashed", col = "black") +
+  geom_text(aes(x = index, 
+                y = 1, 
+                hjust = -1,
+                vjust = 1,
+                label = sig), 
+            data = celltypeByGenotype.df.ex, 
+            angle = 90, 
+            size = 2) + 
+  coord_cartesian(clip = "off") +
+  scale_y_continuous("Proportion", expand = c(0,0), breaks = c(0, E14.5naiveProportion.ex, 0.25, E12.5naiveProportion.ex, 0.5, 0.75, 1), labels = c(0, "E14.5 naive\nproportion", 0.25, "E12.5 naive\nproportion", 0.5, 0.75, 1)) +
+  scale_x_discrete("Cell Type") +
+  theme(plot.margin = margin(6, 0, -10, -12),
+        axis.ticks.x = element_blank(), 
+        axis.text = element_text(size = 6),
+        axis.text.x = element_text(vjust = 2),
+        axis.title = element_text(size = 8),
+        axis.title.x = element_text(vjust = 4),
+        axis.title.y = element_text(vjust = -7)) +
+  monocle:::monocle_theme_opts()
+dev.off()
+```
+
+
+# Cluster Specificity
+```{r specificity}
+melted_df <- melt(exprs(dat.filtered[expressed_genes,]))
+colnames(melted_df) <- c("gene_id","cell_id","value")
+melted_df <- merge(melted_df, pData(dat.filtered)[, c("genotype", "sex", "age", "cluster")], by.x = "cell_id", by.y = 0)
+
+mean_expr_cluster <- melted_df %>%
+  group_by(cluster, gene_id) %>%
+  summarise(mean_expression_cluster = mean(value)) %>%
+  as.data.frame()
+
+mean_expr_cluster <- dcast(mean_expr_cluster, gene_id ~ cluster)
+rownames(mean_expr_cluster) <- mean_expr_cluster$gene_id
+mean_expr_cluster <- mean_expr_cluster[,-1]
+
+#Data frame of mean expression for each gene in each cluster
+
+cluster_specificity <- cummeRbund:::.specificity(mean_expr_cluster)
+
+tmp <- as.data.frame(lookupGeneName(dat.filtered, rownames(cluster_specificity)))
+names(tmp) <- "gene_name"
+
+write.csv(cbind(tmp, cluster_specificity), "cluster_specificity_scores.csv")
+
+melted_cluster_specificity <- melt(cluster_specificity)
+mean_expr_cluster_melted <- melt(mean_expr_cluster)
+names(mean_expr_cluster_melted) <- c("cluster","mean_expr")
+mean_expr_cluster_melted$gene_id <- rep(row.names(mean_expr_cluster), nlevels(pData(dat.filtered)$cluster))
+melted_cluster_specificity$Var2 <- as.numeric(str_replace(melted_cluster_specificity$Var2, pattern = "_spec", replacement = ""))
+names(melted_cluster_specificity) <- c("gene_id", "cluster", "specificity")
+melted_df <- merge(melted_cluster_specificity, mean_expr_cluster_melted, by = c("gene_id", "cluster"))
+melted_df$gene_short_name <- lookupGeneName(dat.filtered, as.character(melted_df$gene_id), unique = F)
+
+index <- apply(cluster_specificity, 1, which.max)
+gene_specificity <- list()
+for(i in 1:nlevels(pData(dat.filtered)$cluster)){
+  gene_specificity[[i]] <- lookupGeneName(dat.filtered, names(index[index == i]))
+}
+
+callouts <- list()
+callouts[[1]] <- c("Gpr17", "Anxa2", "Cnn2", "Myl9", "Plp1", "S100a16", "Sox5", "Rgcc", "Fabp7", "Ccnd2", "Ednrb", "Cdkn1c")
+callouts[[2]] <- c("Igf1", "Hist1h2ah", "Hist1h2ai", "Cyr61", "Hist1h2ap", "Hist1h1b", "Hist1h2ag", "Hes1", "Ccne2", "Tubb6", "Hist1h2ao")
+callouts[[3]] <- c("Epcam", "Cela1", "Cpa2", "Ccnf", "Bub1", "Aurka", "Aurkb", "Top2a", "Cdca3", "Cdca8", "Ccna2", "Cdc20", "Cks2", "Cdk1", "Ccnb1", "Ube2c")
+callouts[[4]] <- c("Hist1h2br", "Nfix", "Neurod4", "Clcn1")
+callouts[[5]] <- c("Pcp2", "H2-Ab1", "hes5")
+callouts[[6]] <- c("Btbd17", "St18", "Mfap4")
+callouts[[7]] <- c("Agrp", "Nos1", "Kcnv1", "Ptgir", "Ntng1", "Nrg1", "Ache", "Myl1", "Sncg", "Vip", "Etv1", "Prph", "Ass1", "Stmn3", "Gal", "Cartpt")
+callouts[[8]] <- c("Tac1", "Ecel1", "Ndufa4l2", "Mgat4c", "Bnc2", "Dlx5", "Npy", "Gfra2", "Slc18a3", "Chgb", "Nrxn", "Scn3b", "Pcp4", "Snap25", "Stmn2") 
+callouts[[9]] <- c("Hoxc10", "Hoxa10", "Hoxc6", "Hoxa7", "Shox2", "Hoxc9", "Hoxa9", "Gata2", "Gfra3", "Maob", "Agtr2", "Slc18a1", "Hoxb7", "Cdkn1a", "Syn2", "Gata3", "Pmp22", "Phox2a", "Th", "Chga", "Maoa", "Ddc", "Dbh", "Nefl", "Nefm")
+
+
+plot_specificity <- function(x){
+#  ggplot(melted_df[melted_df$cluster == x,], aes(x = log10(mean_expr + 1), 
+  df <- melted_df[melted_df$cluster == x & melted_df$gene_short_name %in% gene_specificity[[x]],]
+  ggplot(df, aes(x = log10(mean_expr + 1), y = specificity)) +
+    ggtitle(paste("Cluster", x)) +
+    geom_point(aes(color = ifelse(ifelse(df$gene_short_name %in% callouts[[x]],
+                                                       df$gene_short_name, 
+                                                       "") == "", "no", "yes")),
+                 size = 0.1) +
+    scale_color_manual(values = c("no" = "black", "yes" = "red")) +
+    scale_x_continuous("log10(mean expression + 1)", expand = c(0,0)) +
+    scale_y_continuous("Specificity", expand = c(0,0), limits = c(0,1)) +
+    geom_text(aes(label = ifelse(df$gene_short_name %in% callouts[[x]],
+                                                       df$gene_short_name, 
+                                                       "")),
+                size = 1.4, 
+                hjust = 0, 
+                vjust = 0, 
+                nudge_x = 0.02, 
+                nudge_y = -0.004, 
+                color = "black") +
+    geom_smooth(method = "gam", formula = y ~ s(x, bs = "cs"), size = 0.4) +
+    theme(legend.position = "none",
+            plot.title = element_text(size = 10, hjust = 0.005, face = "plain"),
+            plot.margin = margin(0, 2, 2, 2),
+            axis.title = element_text(size= 8),
+            axis.title.x = element_text(margin = margin(t = 0)),
+            axis.title.y = element_text(margin = margin(r = 0)),
+            axis.text = element_text(size = 6),
+            aspect.ratio = 1
+            )
+}
+
+
+
+p1 <- plot_specificity(1)
+p2 <- plot_specificity(2)
+p3 <- plot_specificity(3)
+p4 <- plot_specificity(4)
+p5 <- plot_specificity(5)
+p6 <- plot_specificity(6)
+p7 <- plot_specificity(7)
+p8 <- plot_specificity(8)
+p9 <- plot_specificity(9)
+
+pdf("SF1-cluster_specificity_callouts.pdf", height = 12, width = 12, useDingbats = F)
+grid.arrange(p1, p2, p3, p4, p5, p6, p7, p8, p9, ncol = 3)
 dev.off()
 ```
 
